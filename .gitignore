@@ -1,1 +1,4 @@
-*.xlsx
+input/
+output/
+.vscode/
+__pycache__/

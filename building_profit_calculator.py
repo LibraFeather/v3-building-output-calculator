@@ -2,35 +2,32 @@ import itertools
 import re
 import json
 from typing import Dict, TypedDict
-
+from models.goods_info import GoodsInfo
 import pandas as pd
 
 import easytool as et
 
+#TODO 旧文件基本可以放弃了
 # 输出路径
-output_path = "output"
+OUTPUT_PATH = "output"
 
 # 游戏文件路径
-goods_path = r"common\\goods"  # 商品
-pop_types_path = r"common\\pop_types"  # pop类型
-pm_path = r"common\\production_methods"  # 生产方式
-pmg_path = r"common\\production_method_groups"  # 生产方式组
-buildings_path = r"common\\buildings"  # 建筑
-localization_path = r"localization\\simp_chinese"  # 本地化
-script_value_path = r"common\\script_values"
+GOODS_PATH = r"common\\goods"  # 商品
+POP_TYPES_PATH = r"common\\pop_types"  # pop类型
+PM_PATH = r"common\\production_methods"  # 生产方式
+PMG_PATH = r"common\\production_method_groups"  # 生产方式组
+BUILDINGS_PATH = r"common\\buildings"  # 建筑
+LOCALIZATION_PATH = r"localization\\simp_chinese"  # 本地化
+SCRPIT_VALUE_PATH = r"common\\script_values"
 
 # 正则表达式模式
 pm_goods_increase_pattern = r"\bgoods_{}.+"  # pm中输入输出商品的格式
 pm_goods_pattern = re.compile(r"put_([\w\-]+)_(\w+)")
 pm_employment_pattern = re.compile(r"building_employment_.+")  # pm的劳动力信息
-pm_employment_type_pattern = re.compile(
-    r"building_employment_([\w\-]+)_add"
-)  # pm的劳动力的类型
+pm_employment_type_pattern = re.compile(r"building_employment_([\w\-]+)_add")  # pm的劳动力的类型
 str_pm_in_pmg = "production_methods"  # 生产方式组代码块中的生产方式
 str_pmg_in_building = "production_method_groups"  # 建筑代码块中的生产方式组代码块
-content_pattern = re.compile(
-    r"[\w\-]+"
-)  # 捕获位于父代码块的子代码块的内容，比如位于建筑代码块中的生产方式组
+content_pattern = re.compile(r"[\w\-]+")  # 捕获位于父代码块的子代码块的内容，比如位于建筑代码块中的生产方式组
 construction_cost_pattern = re.compile(r"\bconstruction_cost.+")
 
 
@@ -50,7 +47,7 @@ BuildingsDict = Dict[str, PMGDict]
 
 # ------------------------------------------------------------------------------------------
 class ScripValuesInfo:
-    def __init__(self, path=script_value_path):
+    def __init__(self, path=SCRPIT_VALUE_PATH):
         self.path = path
         self.dict_construction_cost = self._create_dict_construction_cost()
 
@@ -70,7 +67,7 @@ class GoodsInfo:
     以数据帧类型储存商品的名称和基础价格
     """
 
-    def __init__(self, path=goods_path):
+    def __init__(self, path=GOODS_PATH):
         """
         :param path: 商品文件的路径
         """
@@ -119,7 +116,7 @@ class POPTypesInfo:
     以数据帧类型储存pop类型的名称和数量
     """
 
-    def __init__(self, path=pop_types_path):
+    def __init__(self, path=POP_TYPES_PATH):
         """
         :param path: pop类型文件的路径
         """
@@ -164,7 +161,7 @@ class PMInfo:
     """
 
     def __init__(
-        self, goods_info: GoodsInfo, pop_types_info: POPTypesInfo, path=pm_path
+        self, goods_info: GoodsInfo, pop_types_info: POPTypesInfo, path=PM_PATH
     ):
         """
         :param goods_info: 商品信息的类
@@ -296,7 +293,7 @@ class PMGInfo:
     以字典类型储存生产方式组的信息，包含下一级生产方式的信息
     """
 
-    def __init__(self, dict_pm: dict, path=pmg_path):
+    def __init__(self, dict_pm: dict, path=PMG_PATH):
         """
         :param dict_pm: 生产方式的字典
         :param path: 生产方式组文件的路径
@@ -360,7 +357,7 @@ class BuildingsInfo:
         df_goods: pd.DataFrame,
         df_pop_types: pd.DataFrame,
         dict_construction_cost: dict,
-        path=buildings_path,
+        path=BUILDINGS_PATH,
     ):
         self.path = path
         self.dict, self.dict_bc = self._create_dict(
@@ -522,7 +519,7 @@ class BuildingsInfo:
 
 
 class LocalizationInfo:
-    def __init__(self, dict_list_loc: dict, dict_pmg: dict, path=localization_path):
+    def __init__(self, dict_list_loc: dict, dict_pmg: dict, path=LOCALIZATION_PATH):
         """
         :param dict_list_loc: 被使用的本地化键的列表的字典
         :param path: 本地化文件的路径
@@ -602,19 +599,13 @@ class BuildingProfitCalculator:
             "工资倍率",
         ]
         # 按建筑输出
-        for (
-            building,
-            dict_combination,
-        ) in self.buildings_info.dict_pm_combination.items():
+        for (building, dict_combination) in self.buildings_info.dict_pm_combination.items():
             rows = []
             for combination, combination_profits in dict_combination.items():
                 row = [self.localization_info.dict[pm] for pm in list(combination)]
                 row.extend(list(combination_profits.values()))
                 rows.append(row)
-            column = [
-                self.localization_info.dict[pmg]
-                for pmg in self.buildings_info.nested_dict[building].keys()
-            ]
+            column = [self.localization_info.dict[pmg] for pmg in self.buildings_info.nested_dict[building].keys()]
             column.extend(column_info)
             df = pd.DataFrame(rows, columns=column)
             df.to_excel(
@@ -633,10 +624,7 @@ class BuildingProfitCalculator:
         else:
             column_1 = list(range(max_len_pmg))
         column_0 = ["建筑"] + column_1 + column_info
-        for (
-            building,
-            dict_combination,
-        ) in self.buildings_info.dict_pm_combination.items():
+        for (building, dict_combination) in self.buildings_info.dict_pm_combination.items():
             for combination, combination_profits in dict_combination.items():
                 row = [self.localization_info.dict[building]]
                 list_pm = list(combination)
@@ -644,14 +632,7 @@ class BuildingProfitCalculator:
                     # 确保list_pm的长度至少为4，不需要检测是否为负数
                     list_pm += [""] * (4 - len(list_pm))
                     # 检测有无生产方式属于自动化生产方式
-                    automation_pm = next(
-                        (
-                            pm
-                            for pm in list_pm
-                            if pm in self.localization_info.list_automation_pm
-                        ),
-                        None,
-                    )  # 这里使用了一个生成表达式
+                    automation_pm = next((pm for pm in list_pm if pm in self.localization_info.list_automation_pm), None)  # 这里使用了一个生成表达式
                     if automation_pm is not None:
                         list_pm.remove(automation_pm)
                         list_pm.insert(2, automation_pm)  # 通过insert方法重新排序

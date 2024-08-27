@@ -1,34 +1,30 @@
 import os
 import re
 
+#TODO 旧文件基本可以放弃了
 # 文件夹位置
-vanilla_folder = r"E:\\Steam\\steamapps\\common\\Victoria 3\\game"  # 游戏文件位置
-modified_folder = r"input"  # 或者直接设置到mod的路径
+VANILLA_FOLDER = r"E:\\Steam\\steamapps\\common\\Victoria 3\\game"  # 游戏文件位置
+MODIFIED_FOLDER = r"input"  # 或者直接设置到mod的路径
 
 # 文件位置
-metadata_path = r".metadata\\metadata.json"
+METADATA_PATH = r".metadata\\metadata.json"
 
 # 正则表达式
 replace_paths_pattern = re.compile(r"\"replace_paths\"\s*:\s*\[([\d\D]+?)]")
 path_pattern = re.compile(r"[\w\-/]+")
-
-block_pattern = (
-    r"^[\w\-.]+\s*=\s*{"  # 捕获<name> = {<content>}样式的代码块，<name>必须顶行写
-)
+block_pattern = (r"^[\w\-.]+\s*=\s*{") # 捕获<name> = {<content>}样式的代码块，<name>必须顶行写
 block_pattern_cus = r"{}\s*="  # 自定义的block_pattern
 name_pattern = re.compile(r"[\w\-.]+")
-numeric_attribute_pattern = (
-    r"\s*=\s*([\d\-.]+)"  # 用于捕获数字类型的属性，可以处理负数和小数
-)
+numeric_attribute_pattern = (r"\s*=\s*([\d\-.]+)") # 用于捕获数字类型的属性，可以处理负数和小数
 non_numeric_attribute_pattern = r"\s*=\s*([\w\-.]+)"
 localization_pattern = r"^ [\w\-.]+:.+"
 loc_replace_pattern = re.compile(r"\$([\w\-.]+)\$")
 
 
 def get_list_replace_paths():
-    _metadata_path = os.path.join(modified_folder, metadata_path)
-    if os.path.exists(_metadata_path):
-        with open(_metadata_path, "r", encoding="utf-8-sig") as f:
+    _METADATA_PATH = os.path.join(MODIFIED_FOLDER, METADATA_PATH)
+    if os.path.exists(_METADATA_PATH):
+        with open(_METADATA_PATH, "r", encoding="utf-8-sig") as f:
             content = f.read()
         match = replace_paths_pattern.search(content)
         if match:
@@ -48,7 +44,7 @@ list_replace_path = get_list_replace_paths()
 def get_file_paths(folder_name):
     file_paths = {}
 
-    input_folder_path = os.path.join(modified_folder, folder_name)
+    input_folder_path = os.path.join(MODIFIED_FOLDER, folder_name)
     if folder_name in list_replace_path:
         if os.path.exists(input_folder_path):
             for root, _, files in os.walk(input_folder_path):
@@ -57,8 +53,8 @@ def get_file_paths(folder_name):
             return list(file_paths.values())
 
     # 读取vanilla文件夹内的文件
-    vanilla_folder_path = os.path.join(vanilla_folder, folder_name)
-    for root, _, files in os.walk(vanilla_folder_path):
+    VANILLA_FOLDER_path = os.path.join(VANILLA_FOLDER, folder_name)
+    for root, _, files in os.walk(VANILLA_FOLDER_path):
         for file in files:
             file_paths[file] = os.path.join(root, file)
 
