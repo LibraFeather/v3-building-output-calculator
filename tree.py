@@ -9,22 +9,23 @@ Calista C.Manstainne 于2024.8.24开始重构
 import re
 import os
 
-
 #TODO 按照类型排列
-from constants.constant import GOODS_PATH, POP_TYPES_PATH, VANILLA_FOLDER, BUILDINGS_PATH, BUILDING_COST_CONVERT_DICT, PMG_PATH, PM_PATH
-from constants.pattern import BLOCK_PATTERN_0, NAME_PATTERN, NUMERIC_ATTRIBUTE_PATTERN, BLOCK_PATTERN_CUS, TREE_FINDCHILD_PATTERN, NON_NUMERIC_ATTRIBUTE_PATTERN, \
+from constants.constant import GOODS_PATH, POP_TYPES_PATH, VANILLA_FOLDER, BUILDING_COST_CONVERT_DICT, \
+                              BUILDINGS_PATH,  PMG_PATH, PM_PATH
+from constants.pattern import BLOCK_PATTERN_0, NAME_PATTERN, NUMERIC_ATTRIBUTE_PATTERN, \
+                              BLOCK_PATTERN_CUS, TREE_FINDCHILD_PATTERN, NON_NUMERIC_ATTRIBUTE_PATTERN, \
                               PM_GOODS_INFO_PATTERN, PM_GOODS_PATTERN, PM_EMPLOYMENT_PATTERN, PM_EMPLOYMENT_TYPE_PATTERN
 from models.model import NormalNode, BuildingNode, PMNode
 
 class BuildingInfoTree:
     def __init__(self) -> None:
-        self.tree = []
-
         self.goods_info = self.__get_goods_info()
         self.pop_types_info = self.__get_pops_info()
         self.buildings_info = self.__get_buildings_info()
         self.pmgs_info =  self.__get_pmgs_info()
         self.pms_info = self.__get_pms_info()
+
+        self.tree = self.generate_tree()
 
 #! 预备部分，创建各项存储字典
     def __get_goods_info(self) -> dict:
@@ -155,43 +156,44 @@ class BuildingInfoTree:
 #! 按建筑-生产方式群-生产方式创建信息树
 #TODO 重构生成树代码
     def generate_tree(self):
-        # buildings_block_dict = self.parse_buildings()
-        # return buildings_block_dict
-        pm_dict_total = self.__get_pms_info()
-        print(pm_dict_total)
+        tree_list = self.parse_buildings()
+        return tree_list
 
     def parse_buildings(self):
-        dict_building_blocks = self.extract_blocks_to_dict(BUILDINGS_PATH)
-        for building, building_block in dict_building_blocks.items():
-            building_cost_str = self.get_non_numeric_attribute("required_construction", building_block)
-            building_cost = self.__building_cost_converter(building_cost_str)
-
-            self.tree.append(BuildingNode(
+        buildings_list = []
+        for building, building_info in self.buildings_info.items():
+            buildings_list.append(BuildingNode(
                 name = building,
                 localization_key = building,
-                children = self.parse_pmgs(building, building_block),
-                building_cost = building_cost
+                children = self.parse_pmgs(building_info['pmgs']),
+                building_cost = building_info['cost']
             ))
 
-    def parse_pmgs(self, building, building_block):
-        node_list = []
+        return buildings_list
 
-        pmg_block = self.extract_one_block("production_method_groups", building_block)
-        if pmg_block is None:
-            print(f"{building}格式异常，未找到任何生产方式组")
-        pmg_block_splited = re.compile(TREE_FINDCHILD_PATTERN).findall(pmg_block)
-
-        for pmg in pmg_block_splited:
-            node_list.append(NormalNode(
+    def parse_pmgs(self, pmgs: list):
+        pmgs_list = []
+        for pmg in pmgs:
+            pmgs_list.append(NormalNode(
                 name = pmg,
                 localization_key = pmg,
-                children = self.parse_pms(pmg, pmg_block)
+                children = self.parse_pms(self.pmgs_info[pmg])
             ))
 
-        return node_list
+        return pmgs_list
 
-    def parse_pms(self, pmg, pmg_block):
-        return 1
+    def parse_pms(self, pms):
+        pms_list = []
+        for pm in pms:
+            pms_list.append(PMNode(
+                name = pm,
+                localization_key = pm,
+                good_input = self.pms_info[pm]['input'],
+                good_output = self.pms_info[pm]['output'],
+                workforce = self.pms_info[pm]['workscale'],
+                children = []
+            ))
+        return pms_list
 
 #! 生成树要使用的通用工具
     def get_config_file_paths(self, folder_name):
@@ -350,7 +352,3 @@ class BuildingInfoTree:
             return match.group(1)
         else:
             return None
-
-if __name__ == '__main__':
-    building_info_tree = BuildingInfoTree()
-    building_info_tree.generate_tree()
