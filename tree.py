@@ -57,21 +57,24 @@ class BuildingInfoTree:
         return pops_dict
 
     def __get_buildings_info(self) -> dict:
-        buildings_list = []
+        buildings_dict = {}
         building_blocks_dict = self.extract_blocks_to_dict(BUILDINGS_PATH)
 
         for building, building_block in building_blocks_dict.items():
             building_cost_str = self.get_non_numeric_attribute("required_construction", building_block)
-            building_cost = self.building_cost_converter(building_cost_str)
-            buildings_list.append({'name': building, 'cost': building_cost})
+            building_cost = self.__building_cost_converter(building_cost_str)
+            pmg_block = self.extract_one_block("production_method_groups", building_block)
+            if pmg_block is None:
+                print(f"{building}格式异常，未找到任何生产方式组")
+            pmg_block_splited = re.compile(TREE_FINDCHILD_PATTERN).findall(pmg_block)
+            buildings_dict[building] = {'cost': building_cost, 'pmgs': pmg_block_splited}
         
-        return buildings_list
+        return buildings_dict
 
     def __get_pmgs_info(self) -> dict:
         dict_pmg_blocks = self.extract_blocks_to_dict(PMG_PATH)
-        pmgs_list = []
+        pmgs_dict = {}
         for pmg, pmg_block in dict_pmg_blocks.items():
-            pmg_dict = {}
             pm_block = self.extract_one_block("production_methods", pmg_block)
             if pm_block is None:
                 print(f"{pmg}格式异常，因此无法找到任何生产方式")
@@ -79,9 +82,8 @@ class BuildingInfoTree:
             pms_list = []
             for pm in re.compile(TREE_FINDCHILD_PATTERN).findall(pm_block):
                 pms_list.append(pm)
-            pmg_dict[pmg] = pms_list
-            pmgs_list.append(pmg_dict)
-        return pmgs_list
+            pmgs_dict[pmg] = pms_list
+        return pmgs_dict
 
     def __get_pms_info(self) -> dict:
         """
@@ -97,7 +99,7 @@ class BuildingInfoTree:
             dict_pm[pm]['workscale'] = self.__add_employment_info_for_pm(pm, pm_block)
         return dict_pm
 
-    def building_cost_converter(self, building_cost_str):
+    def __building_cost_converter(self, building_cost_str):
         if building_cost_str in BUILDING_COST_CONVERT_DICT.keys():
             return BUILDING_COST_CONVERT_DICT[building_cost_str]
         else:
@@ -105,7 +107,7 @@ class BuildingInfoTree:
 
     def __add_good_info_for_pm(self, pm, pm_block, io_type) -> list:
         goods_info_str_list = re.findall(PM_GOODS_INFO_PATTERN.format(io_type), pm_block)
-        goods_info_list = []
+        goods_info_dict = {}
         for goods_input in goods_info_str_list:
             matched_good_str = re.compile(PM_GOODS_PATTERN).search(goods_input)
             if not matched_good_str:
@@ -126,12 +128,12 @@ class BuildingInfoTree:
                 continue
             # 商品数量大部分都是整数，但是自给农场是小数，这里统一以浮点数记录
             number = float(number)
-            goods_info_list.append({'good': good, 'number': number})
-        return goods_info_list
+            goods_info_dict[good] = number
+        return goods_info_dict
     
     def __add_employment_info_for_pm(self, pm, pm_block) -> list:
         list_workforce_add = re.compile(PM_EMPLOYMENT_PATTERN).findall(pm_block)
-        workforce_info_list = []
+        workforce_info_dict = {}
         for workforce_add in list_workforce_add:
             match_workforce = re.compile(PM_EMPLOYMENT_TYPE_PATTERN).search(workforce_add)
             if not match_workforce:
@@ -147,8 +149,8 @@ class BuildingInfoTree:
                 continue
             # 劳动力数量应该是整数
             number = int(number)
-            workforce_info_list.append({'workforce': workforce, 'number': number})
-        return workforce_info_list
+            workforce_info_dict[workforce] = number
+        return workforce_info_dict
 
 #! 按建筑-生产方式群-生产方式创建信息树
 #TODO 重构生成树代码
@@ -162,7 +164,7 @@ class BuildingInfoTree:
         dict_building_blocks = self.extract_blocks_to_dict(BUILDINGS_PATH)
         for building, building_block in dict_building_blocks.items():
             building_cost_str = self.get_non_numeric_attribute("required_construction", building_block)
-            building_cost = self.building_cost_converter(building_cost_str)
+            building_cost = self.__building_cost_converter(building_cost_str)
 
             self.tree.append(BuildingNode(
                 name = building,
