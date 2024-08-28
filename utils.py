@@ -1,11 +1,11 @@
-'''
+"""
 整个utils文件分成三部分：
 1. 从P语言配置文件中提取字符串整体
 2. 从字符串中通过正则表达式生成数据
 3. 处理生成后数据
-'''
+"""
 
-#TODO 原本想做成独立于tree.py的通用工具函数，后面想还是算了，直接整合进tree.py里面来，所以这个文件最终也是要被放弃的
+# TODO 原本想做成独立于tree.py的通用工具函数，后面想还是算了，直接整合进tree.py里面来，所以这个文件最终也是要被放弃的
 import os
 import re
 import json
@@ -40,11 +40,11 @@ class Utils():
     #     list_replace_paths = [path.replace("/", "\\") for path in re.compile(PATH_PATTERN).findall(match.group(1))]
     #     return list_replace_paths
 
-#! 第1部分
+# ! 第1部分
     def get_config_file_paths(self, folder_name):
         file_paths = {}
 
-        #TODO 等完成了重构再考虑Mod的事情
+        # TODO 等完成了重构再考虑Mod的事情
         # input_folder_path = os.path.join(MODFILE_FOLDER, folder_name)
         # if folder_name in self.list_replace_path and self.list_replace_path != '':
         #     if os.path.exists(input_folder_path):

@@ -1,33 +1,36 @@
-'''
+"""
 Calista C.Manstainne 于2024.8.24开始重构
 整体思路：
 1. 用正则表达式处理p语言字段的同时，做出存储各类数据的容器
 2. 按照建筑-生产方式群-生产方式结构生成一棵树，数据来源之前的容器
 3. 根据这棵树，处理各项数据，做成表格导出（计划新开一个文件来处理）
-'''
+"""
 
 import re
 import os
 
-#TODO 按照类型排列
-from constants.constant import VANILLA_FOLDER, BUILDING_COST_CONVERT_DICT, \
-                               GOODS_PATH, POP_TYPES_PATH, BUILDINGS_PATH,  PMG_PATH, PM_PATH
+# TODO 按照类型排列
+from constants.constant import GOODS_PATH, POP_TYPES_PATH, VANILLA_FOLDER, BUILDING_COST_CONVERT_DICT, \
+    BUILDINGS_PATH, PMG_PATH, PM_PATH, LOCALIZATION_PATH
 from constants.pattern import BLOCK_PATTERN_0, NAME_PATTERN, NUMERIC_ATTRIBUTE_PATTERN, \
-                              BLOCK_PATTERN_CUS, TREE_FINDCHILD_PATTERN, NON_NUMERIC_ATTRIBUTE_PATTERN, \
-                              PM_GOODS_INFO_PATTERN, PM_GOODS_PATTERN, PM_EMPLOYMENT_PATTERN, PM_EMPLOYMENT_TYPE_PATTERN
+    BLOCK_PATTERN_CUS, TREE_FINDCHILD_PATTERN, NON_NUMERIC_ATTRIBUTE_PATTERN, \
+    PM_GOODS_INFO_PATTERN, PM_GOODS_PATTERN, PM_EMPLOYMENT_PATTERN, PM_EMPLOYMENT_TYPE_PATTERN, LOCALIZATION_PATTERN, \
+    LOCALIZATION_REPLACE_PATTERN
 from models.model import NormalNode, BuildingNode, PMNode
+
 
 class BuildingInfoTree:
     def __init__(self) -> None:
         self.goods_info = self.__get_goods_info()
         self.pop_types_info = self.__get_pops_info()
         self.buildings_info = self.__get_buildings_info()
-        self.pmgs_info =  self.__get_pmgs_info()
+        self.pmgs_info = self.__get_pmgs_info()
         self.pms_info = self.__get_pms_info()
+        self.localization_info = self.__get_localization_info()
 
         self.tree = self.generate_tree()
 
-#! 预备部分，创建各项存储字典
+    # ! 预备部分，创建各项存储字典
     def __get_goods_info(self) -> dict:
         """
         两列数据：商品名称和基础价格
@@ -42,7 +45,7 @@ class BuildingInfoTree:
             # 价格是整数，为了兼容性考虑，这里记为浮点数
             goods_dict[good] = float(cost)
         return goods_dict
-    
+
     def __get_pops_info(self) -> dict:
         """
         两列数据：pop类型/工资权重
@@ -67,9 +70,9 @@ class BuildingInfoTree:
             pmg_block = self.extract_one_block("production_method_groups", building_block)
             if pmg_block is None:
                 print(f"{building}格式异常，未找到任何生产方式组")
-            pmg_block_splited = re.compile(TREE_FINDCHILD_PATTERN).findall(pmg_block)
-            buildings_dict[building] = {'cost': building_cost, 'pmgs': pmg_block_splited}
-        
+            pmg_block_split = re.compile(TREE_FINDCHILD_PATTERN).findall(pmg_block)
+            buildings_dict[building] = {'cost': building_cost, 'pmgs': pmg_block_split}
+
         return buildings_dict
 
     def __get_pmgs_info(self) -> dict:
@@ -100,13 +103,14 @@ class BuildingInfoTree:
             dict_pm[pm]['workscale'] = self.__add_employment_info_for_pm(pm, pm_block)
         return dict_pm
 
-    def __building_cost_converter(self, building_cost_str):
+    @staticmethod
+    def __building_cost_converter(building_cost_str):
         if building_cost_str in BUILDING_COST_CONVERT_DICT.keys():
             return BUILDING_COST_CONVERT_DICT[building_cost_str]
         else:
             return 0.0
 
-    def __add_good_info_for_pm(self, pm, pm_block, io_type) -> list:
+    def __add_good_info_for_pm(self, pm, pm_block, io_type) -> dict:
         goods_info_str_list = re.findall(PM_GOODS_INFO_PATTERN.format(io_type), pm_block)
         goods_info_dict = {}
         for goods_input in goods_info_str_list:
@@ -131,8 +135,36 @@ class BuildingInfoTree:
             number = float(number)
             goods_info_dict[good] = number
         return goods_info_dict
-    
-    def __add_employment_info_for_pm(self, pm, pm_block) -> list:
+
+    def __get_localization_info(self) -> dict:
+        content = self.extract_all_from_config_file_paths(LOCALIZATION_PATH)
+        localization_dict_all = self.extract_all_blocks(LOCALIZATION_PATTERN, content, "\"")
+
+        localization_keys_used = list(self.buildings_info.keys()) + list(self.pmgs_info.keys()) + list(
+            self.pms_info.keys())
+        localization_dict_used = {}
+        for key in localization_keys_used:
+            if key in localization_dict_all:  # 一些键没有对应的值
+                localization_dict_used[key] = localization_dict_all[key]
+            else:
+                print(f"找不到{key}的本地化")
+                localization_dict_used[key] = key
+
+        for key, value in localization_dict_used.items():
+            # dummy building的本地化值过长，需要被替换，这里用本地化值的长度作为依据
+            if len(value) > 50:
+                print(f"{key}的本地化值过长，被dummy代替")
+                localization_dict_used[key] = "dummy"
+            else:
+                replace_list = re.findall(LOCALIZATION_REPLACE_PATTERN, value)
+                if replace_list:
+                    for replace in replace_list:
+                        if replace in localization_dict_all.keys():
+                            value = value.replace(f"${replace}$", localization_dict_all[replace])
+                    localization_dict_used[key] = value
+        return localization_dict_used
+
+    def __add_employment_info_for_pm(self, pm, pm_block) -> dict:
         list_workforce_add = re.compile(PM_EMPLOYMENT_PATTERN).findall(pm_block)
         workforce_info_dict = {}
         for workforce_add in list_workforce_add:
@@ -153,7 +185,7 @@ class BuildingInfoTree:
             workforce_info_dict[workforce] = number
         return workforce_info_dict
 
-#! 按建筑-生产方式群-生产方式创建信息树
+    # ! 按建筑-生产方式群-生产方式创建信息树
     def generate_tree(self):
         tree_list = self.parse_buildings()
         return tree_list
@@ -162,10 +194,10 @@ class BuildingInfoTree:
         buildings_list = []
         for building, building_info in self.buildings_info.items():
             buildings_list.append(BuildingNode(
-                name = building,
-                localization_key = building,
-                children = self.parse_pmgs(building_info['pmgs']),
-                building_cost = building_info['cost']
+                name=building,
+                localization_key=self.localization_info[building],
+                children=self.parse_pmgs(building_info['pmgs']),
+                building_cost=building_info['cost']
             ))
 
         return buildings_list
@@ -174,9 +206,9 @@ class BuildingInfoTree:
         pmgs_list = []
         for pmg in pmgs:
             pmgs_list.append(NormalNode(
-                name = pmg,
-                localization_key = pmg,
-                children = self.parse_pms(self.pmgs_info[pmg])
+                name=pmg,
+                localization_key=self.localization_info[pmg],
+                children=self.parse_pms(self.pmgs_info[pmg])
             ))
 
         return pmgs_list
@@ -185,20 +217,21 @@ class BuildingInfoTree:
         pms_list = []
         for pm in pms:
             pms_list.append(PMNode(
-                name = pm,
-                localization_key = pm,
-                good_input = self.pms_info[pm]['input'],
-                good_output = self.pms_info[pm]['output'],
-                workforce = self.pms_info[pm]['workscale'],
-                children = []
+                name=pm,
+                localization_key=self.localization_info[pm],
+                good_input=self.pms_info[pm]['input'],
+                good_output=self.pms_info[pm]['output'],
+                workforce=self.pms_info[pm]['workscale'],
+                children=[]
             ))
         return pms_list
 
-#! 生成树要使用的通用工具
-    def get_config_file_paths(self, folder_name):
+    @staticmethod
+    # ! 生成树要使用的通用工具
+    def get_config_file_paths(folder_name: str):
         file_paths = {}
 
-        #TODO 等完成了重构再考虑Mod的事情
+        # TODO 等完成了重构再考虑Mod的事情
         # input_folder_path = os.path.join(MODFILE_FOLDER, folder_name)
         # if folder_name in self.list_replace_path and self.list_replace_path != '':
         #     if os.path.exists(input_folder_path):
@@ -249,7 +282,8 @@ class BuildingInfoTree:
         """
         return re.sub(r"#.*$", "", self.extract_all_from_config_file_paths(path), flags=re.MULTILINE)
 
-    def _extract_bracket_content(self, text: str, start: int, char: str):
+    @staticmethod
+    def _extract_bracket_content(text: str, start: int, char: str):
         """
         提取给定字符之间的内容
         :param text: 待检索文本
@@ -322,7 +356,8 @@ class BuildingInfoTree:
         _, block = self._extract_bracket_content(text, match.start(), "{")
         return block
 
-    def get_numeric_attribute(self, name: str, text: str):
+    @staticmethod
+    def get_numeric_attribute(name: str, text: str):
         """
         输入数字类型属性的名称和待查询文本，输出属性的值
         :param name: 属性的名称
@@ -340,7 +375,8 @@ class BuildingInfoTree:
         else:
             return None
 
-    def get_non_numeric_attribute(self, name: str, text: str):
+    @staticmethod
+    def get_non_numeric_attribute(name: str, text: str):
         if name.startswith("_"):
             start = ""
         else:
