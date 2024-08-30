@@ -10,8 +10,8 @@ import re
 import os
 
 #TODO 按照类型排列
-from constants.constant import GOODS_PATH, POP_TYPES_PATH, VANILLA_FOLDER, BUILDING_COST_CONVERT_DICT, \
-                              BUILDINGS_PATH,  PMG_PATH, PM_PATH
+from constants.constant import VANILLA_FOLDER, BUILDING_COST_CONVERT_DICT, \
+                               GOODS_PATH, POP_TYPES_PATH, BUILDINGS_PATH,  PMG_PATH, PM_PATH
 from constants.pattern import BLOCK_PATTERN_0, NAME_PATTERN, NUMERIC_ATTRIBUTE_PATTERN, \
                               BLOCK_PATTERN_CUS, TREE_FINDCHILD_PATTERN, NON_NUMERIC_ATTRIBUTE_PATTERN, \
                               PM_GOODS_INFO_PATTERN, PM_GOODS_PATTERN, PM_EMPLOYMENT_PATTERN, PM_EMPLOYMENT_TYPE_PATTERN
@@ -154,7 +154,6 @@ class BuildingInfoTree:
         return workforce_info_dict
 
 #! 按建筑-生产方式群-生产方式创建信息树
-#TODO 重构生成树代码
     def generate_tree(self):
         tree_list = self.parse_buildings()
         return tree_list
