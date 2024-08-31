@@ -11,13 +11,13 @@ MODFILE_FOLDER = r"input"  # 或者直接设置到mod的路径
 # 文件位置
 METADATA_PATH = r".metadata\\metadata.json"
 
-GOODS_PATH = r"common\\goods"  # 商品
-POP_TYPES_PATH = r"common\\pop_types"  # pop类型
-PM_PATH = r"common\\production_methods"  # 生产方式
-PMG_PATH = r"common\\production_method_groups"  # 生产方式组
-BUILDINGS_PATH = r"common\\buildings"  # 建筑
-LOCALIZATION_PATH = r"localization\\simp_chinese"  # 本地化
-SCRIPT_VALUE_PATH = r"common\\script_values"
+GOODS_PATH = "common\\goods"  # 商品
+POP_TYPES_PATH = "common\\pop_types"  # pop类型
+PM_PATH = "common\\production_methods"  # 生产方式
+PMG_PATH = "common\\production_method_groups"  # 生产方式组
+BUILDINGS_PATH = "common\\buildings"  # 建筑
+LOCALIZATION_PATH = "localization\\simp_chinese"  # 本地化
+SCRIPT_VALUE_PATH = "common\\script_values"
 
 LOGIC_KEYS_LIST = ["if", "else_if", "else", "add", "multiply", "divide"]
 

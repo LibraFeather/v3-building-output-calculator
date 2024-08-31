@@ -13,7 +13,7 @@ BLOCK_PATTERN_CUS = r"{}\s*="  # 自定义的block_pattern
 NAME_PATTERN = r"[\w\-.]+"
 NUMERIC_ATTRIBUTE_PATTERN = r"\s*=\s*([\d\-.]+)"  # 用于捕获数字类型的属性，可以处理负数和小数
 NON_NUMERIC_ATTRIBUTE_PATTERN = r"\s*=\s*([\w\-.]+)"
-LOCALIZATION_PATTERN = r"^ [\w\-.]+:.+"
+LOCALIZATION_PATTERN = r"^\s+[\w\-.]+:.+"
 LOCALIZATION_REPLACE_PATTERN = r"\$([\w\-.]+)\$"
 OPERATOR_PATTERN = r"(<|<=|=|>=|>)"
 

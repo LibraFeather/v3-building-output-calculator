@@ -3,6 +3,7 @@ import itertools
 from collections import Counter
 
 from tree import BuildingInfoTree
+from config.path import OUTPUT_PATH
 
 
 class Calculator:
@@ -12,18 +13,25 @@ class Calculator:
         self.pop_type_info = building_info_tree_complex.pop_types_info
         self.building_info_tree = building_info_tree_complex.tree
 
-    def generate_info_dict_for_single_building(self, building):
+    def __generate_info_dict_for_single_building(self, building):
         building_info_list = []
         pmgs_localization_list = [pmg.localization_key for pmg in building.children]
-        combinations = list(itertools.product(*(node.children for node in building.children)))
+        combinations = itertools.product(*(node.children for node in building.children))
 
         for combination in combinations:
-            one_line_data = self.generate_one_line_data(combination, pmgs_localization_list)
-            one_line_data_finished = self.calculate_data(one_line_data, building)
+            one_line_data = self.__generate_one_line_data(combination, pmgs_localization_list)
+            one_line_data_finished = self.__calculate_data(one_line_data, building)
             building_info_list.append(one_line_data_finished)
         return building_info_list
 
-    def generate_one_line_data(self, combination, pmgs_localization_list):
+    @staticmethod
+    def __generate_one_line_data(combination, pmgs_localization_list):
+        def check_workforce_positive(workforce_dict: dict):
+            for _, v in workforce_dict.items():
+                if v < 0:
+                    workforce_dict[_] = 0
+            return workforce_dict
+
         one_line_data = {'good_input': Counter(), 'good_output': Counter(), 'workforce': Counter()}
         for i in range(len(pmgs_localization_list)):
             one_line_data[pmgs_localization_list[i]] = combination[i].localization_key
@@ -33,11 +41,11 @@ class Calculator:
         one_line_data['good_input'] = dict(one_line_data['good_input'])
         one_line_data['good_output'] = dict(one_line_data['good_output'])
         one_line_data['workforce'] = dict(one_line_data['workforce'])
-        one_line_data['workforce'] = self.check_workforce_positive(one_line_data['workforce'])
+        one_line_data['workforce'] = check_workforce_positive(one_line_data['workforce'])
 
         return one_line_data
 
-    def calculate_data(self, one_line_data, building):
+    def __calculate_data(self, one_line_data, building):
         """
         #! 计算8项：商品总投入/商品总产出/劳动力总数/利润/人均利润/利润除以建造力/回报率/工资倍率
         利润 = 商品产出总产值 - 商品投入总产值
@@ -46,18 +54,17 @@ class Calculator:
         回报率 = 商品产出总产值/商品投入总产值
         工资倍率 = 劳动力工资权重的加权平均
         """
-        input_cost = sum(one_line_data['good_input'].get(item, 0) * self.goods_info.get(item, 0)
+        input_cost = sum(one_line_data['good_input'][item] * self.goods_info[item]
                          for item in one_line_data['good_input'])
-        output_cost = sum(one_line_data['good_output'].get(item, 0) * self.goods_info.get(item, 0)
+        output_cost = sum(one_line_data['good_output'][item] * self.goods_info[item]
                           for item in one_line_data['good_output'])
         workforce_population = sum(one_line_data['workforce'].values())
         profit = output_cost - input_cost
         per_capita_profit = profit / workforce_population * 52 if workforce_population else 'Null'
         per_cc_profit = profit / building.building_cost if building.building_cost else 'Null'
         rate_of_return = output_cost / input_cost if input_cost > 0 else 'Null'
-        wage_weight = sum(one_line_data['workforce'].get(item, 0) * self.pop_type_info.get(item, 0)
-                          for item in one_line_data['workforce']) / workforce_population \
-            if workforce_population else 'Null'
+        wage_weight = sum(one_line_data['workforce'][item] * self.pop_type_info[item] for item in
+                          one_line_data['workforce']) / workforce_population if workforce_population else 'Null'
 
         one_line_data['input_cost'] = input_cost
         one_line_data['output_cost'] = output_cost
@@ -70,7 +77,7 @@ class Calculator:
         return one_line_data
 
     @staticmethod
-    def transfer_dict_to_df(building_info_list, building):
+    def __transfer_dict_to_df(building_info_list, building):
         building_info_df = pd.DataFrame(building_info_list)
         column_headers = {
             'input_cost': '商品投入总价值',
@@ -83,18 +90,16 @@ class Calculator:
             'wage_weight': '工资倍率'
         }
         building_info_df.rename(columns=column_headers, inplace=True)
-        building_info_df.iloc[:, 3:].to_excel(f'output\\buildings\\{building.localization_key}.xlsx', index=False)
-        print(f'{building.localization_key}输出成功！')
+        building_info_df.iloc[:, 3:].to_excel(f'{OUTPUT_PATH}\\buildings\\{building.localization_key}_{building.name}.xlsx',
+                                              index=False)
+        print(f'{building.localization_key}_{building.name}输出成功！')
 
-    @staticmethod
-    def check_workforce_positive(workforce_dict: dict):
-        for _, v in workforce_dict.items():
-            if v < 0:
-                workforce_dict[_] = 0
-        return workforce_dict
+    def output_every_building(self):
+        for building in self.building_info_tree:
+            building_dict = self.__generate_info_dict_for_single_building(building)
+            self.__transfer_dict_to_df(building_dict, building)
 
 
 if __name__ == '__main__':
     calculator = Calculator()
-    test_dict = calculator.generate_info_dict_for_single_building(calculator.building_info_tree[0])
-    calculator.transfer_dict_to_df(test_dict, calculator.building_info_tree[0])
+    calculator.output_every_building()

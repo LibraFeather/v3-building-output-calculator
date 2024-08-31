@@ -7,15 +7,14 @@ Calista C.Manstainne 于2024.8.24开始重构
 """
 
 import re
-import os
+import utils.textproc as tp
+import utils.test as t
 
 # TODO 按照类型排列
-from constants.constant import GOODS_PATH, POP_TYPES_PATH, VANILLA_FOLDER, BUILDING_COST_CONVERT_DICT, \
-    BUILDINGS_PATH, PMG_PATH, PM_PATH, LOCALIZATION_PATH
-from constants.pattern import BLOCK_PATTERN_0, NAME_PATTERN, NUMERIC_ATTRIBUTE_PATTERN, \
-    BLOCK_PATTERN_CUS, TREE_FINDCHILD_PATTERN, NON_NUMERIC_ATTRIBUTE_PATTERN, \
-    PM_GOODS_INFO_PATTERN, PM_GOODS_PATTERN, PM_EMPLOYMENT_PATTERN, PM_EMPLOYMENT_TYPE_PATTERN, LOCALIZATION_PATTERN, \
-    LOCALIZATION_REPLACE_PATTERN
+from constants.constant import GOODS_PATH, POP_TYPES_PATH, BUILDING_COST_CONVERT_DICT, BUILDINGS_PATH, PMG_PATH, \
+    PM_PATH, LOCALIZATION_PATH
+from constants.pattern import TREE_FINDCHILD_PATTERN, PM_GOODS_INFO_PATTERN, PM_GOODS_PATTERN, PM_EMPLOYMENT_PATTERN, \
+    PM_EMPLOYMENT_TYPE_PATTERN, LOCALIZATION_PATTERN, LOCALIZATION_REPLACE_PATTERN
 from models.model import NormalNode, BuildingNode, PMNode
 
 
@@ -31,14 +30,15 @@ class BuildingInfoTree:
         self.tree = self.generate_tree()
 
     # ! 预备部分，创建各项存储字典
-    def __get_goods_info(self) -> dict:
+    @staticmethod
+    def __get_goods_info() -> dict:
         """
         两列数据：商品名称和基础价格
         """
-        dict_good_blocks = self.extract_blocks_to_dict(GOODS_PATH)
+        dict_good_blocks = tp.extract_blocks_to_dict(GOODS_PATH)
         goods_dict = {}
         for good, good_block in dict_good_blocks.items():
-            cost = self.get_numeric_attribute("cost", good_block)
+            cost = tp.get_numeric_attribute("cost", good_block)
             if cost is None:
                 print(f"找不到{good}的基础价格，因此{good}将被忽略")
                 continue
@@ -46,14 +46,15 @@ class BuildingInfoTree:
             goods_dict[good] = float(cost)
         return goods_dict
 
-    def __get_pops_info(self) -> dict:
+    @staticmethod
+    def __get_pops_info() -> dict:
         """
         两列数据：pop类型/工资权重
         """
-        dict_pop_blocks = self.extract_blocks_to_dict(POP_TYPES_PATH)
+        dict_pop_blocks = tp.extract_blocks_to_dict(POP_TYPES_PATH)
         pops_dict = {}
         for pop_type, pop_type_block in dict_pop_blocks.items():
-            wage_weight = self.get_numeric_attribute("wage_weight", pop_type_block)
+            wage_weight = tp.get_numeric_attribute("wage_weight", pop_type_block)
             if wage_weight is None:
                 wage_weight = 0
                 print(f"未找到{pop_type}的wage_weight，因此假定为0")
@@ -62,12 +63,12 @@ class BuildingInfoTree:
 
     def __get_buildings_info(self) -> dict:
         buildings_dict = {}
-        building_blocks_dict = self.extract_blocks_to_dict(BUILDINGS_PATH)
+        building_blocks_dict = tp.extract_blocks_to_dict(BUILDINGS_PATH)
 
         for building, building_block in building_blocks_dict.items():
-            building_cost_str = self.get_non_numeric_attribute("required_construction", building_block)
+            building_cost_str = tp.get_non_numeric_attribute("required_construction", building_block)
             building_cost = self.__building_cost_converter(building_cost_str)
-            pmg_block = self.extract_one_block("production_method_groups", building_block)
+            pmg_block = tp.extract_one_block("production_method_groups", building_block)
             if pmg_block is None:
                 print(f"{building}格式异常，未找到任何生产方式组")
             pmg_block_split = re.compile(TREE_FINDCHILD_PATTERN).findall(pmg_block)
@@ -75,11 +76,12 @@ class BuildingInfoTree:
 
         return buildings_dict
 
-    def __get_pmgs_info(self) -> dict:
-        dict_pmg_blocks = self.extract_blocks_to_dict(PMG_PATH)
+    @staticmethod
+    def __get_pmgs_info() -> dict:
+        dict_pmg_blocks = tp.extract_blocks_to_dict(PMG_PATH)
         pmgs_dict = {}
         for pmg, pmg_block in dict_pmg_blocks.items():
-            pm_block = self.extract_one_block("production_methods", pmg_block)
+            pm_block = tp.extract_one_block("production_methods", pmg_block)
             if pm_block is None:
                 print(f"{pmg}格式异常，因此无法找到任何生产方式")
                 continue
@@ -94,7 +96,7 @@ class BuildingInfoTree:
         获取生产方式的字典
         :return : 生产方式的字典
         """
-        dict_pm_blocks = self.extract_blocks_to_dict(PM_PATH)
+        dict_pm_blocks = tp.extract_blocks_to_dict(PM_PATH)
         dict_pm = {}
         for pm, pm_block in dict_pm_blocks.items():
             dict_pm[pm] = {}
@@ -127,7 +129,7 @@ class BuildingInfoTree:
             if good not in self.goods_info.keys():
                 print(f"未找到{pm}中{good}的定义")
                 continue
-            number = self.get_numeric_attribute(f"_{am_type}", goods_input)
+            number = tp.get_numeric_attribute(f"_{am_type}", goods_input)
             if number is None:
                 print(f"{pm}中的{goods_input}格式异常，无法捕获{good}的{io_type}数量")
                 continue
@@ -137,8 +139,10 @@ class BuildingInfoTree:
         return goods_info_dict
 
     def __get_localization_info(self) -> dict:
-        content = self.extract_all_from_config_file_paths(LOCALIZATION_PATH)
-        localization_dict_all = self.extract_all_blocks(LOCALIZATION_PATTERN, content, "\"")
+        content = tp.txt_combiner(LOCALIZATION_PATH)
+        t.output_to_test_txt(content)
+        localization_dict_all = tp.extract_all_blocks(LOCALIZATION_PATTERN, content, "\"")
+        t.output_to_test_json(localization_dict_all)
 
         localization_keys_used = list(self.buildings_info.keys()) + list(self.pmgs_info.keys()) + list(
             self.pms_info.keys())
@@ -151,17 +155,19 @@ class BuildingInfoTree:
                 localization_dict_used[key] = key
 
         for key, value in localization_dict_used.items():
-            # dummy building的本地化值过长，需要被替换，这里用本地化值的长度作为依据
-            if len(value) > 50:
-                print(f"{key}的本地化值过长，被dummy代替")
-                localization_dict_used[key] = "dummy"
-            else:
-                replace_list = re.findall(LOCALIZATION_REPLACE_PATTERN, value)
-                if replace_list:
-                    for replace in replace_list:
-                        if replace in localization_dict_all.keys():
-                            value = value.replace(f"${replace}$", localization_dict_all[replace])
-                    localization_dict_used[key] = value
+            replace_list = re.findall(LOCALIZATION_REPLACE_PATTERN, value)
+            if replace_list:
+                for replace in replace_list:
+                    if replace in localization_dict_all.keys():
+                        value = value.replace(f"${replace}$", localization_dict_all[replace])
+                localization_dict_used[key] = value
+
+        # dummy building的本地化值过长，需要被替换，这里用本地化值的长度作为依据
+        for building in self.buildings_info:
+            if len(localization_dict_used[building]) > 50:
+                print(f"{building}的本地化值过长，被dummy代替")
+                localization_dict_used[building] = "dummy"
+
         return localization_dict_used
 
     def __add_employment_info_for_pm(self, pm, pm_block) -> dict:
@@ -176,7 +182,7 @@ class BuildingInfoTree:
             if workforce not in self.pop_types_info.keys():
                 print(f"未找到{pm}中{workforce}的定义")
                 continue
-            number = self.get_numeric_attribute("_add", workforce_add)
+            number = tp.get_numeric_attribute("_add", workforce_add)
             if number is None:
                 print(f"未找到{pm}中{workforce}的数量")
                 continue
@@ -205,185 +211,29 @@ class BuildingInfoTree:
     def parse_pmgs(self, pmgs: list):
         pmgs_list = []
         for pmg in pmgs:
-            pmgs_list.append(NormalNode(
-                name=pmg,
-                localization_key=self.localization_info[pmg],
-                children=self.parse_pms(self.pmgs_info[pmg])
-            ))
+            if pmg in self.pmgs_info:
+                pmgs_list.append(NormalNode(
+                    name=pmg,
+                    localization_key=self.localization_info[pmg],
+                    children=self.parse_pms(self.pmgs_info[pmg])
+                ))
+            else:
+                print(f"{pmg}无定义")
 
         return pmgs_list
 
     def parse_pms(self, pms):
         pms_list = []
         for pm in pms:
-            pms_list.append(PMNode(
-                name=pm,
-                localization_key=self.localization_info[pm],
-                good_input=self.pms_info[pm]['input'],
-                good_output=self.pms_info[pm]['output'],
-                workforce=self.pms_info[pm]['workscale'],
-                children=[]
-            ))
+            if pm in self.pms_info:
+                pms_list.append(PMNode(
+                    name=pm,
+                    localization_key=self.localization_info[pm],
+                    good_input=self.pms_info[pm]['input'],
+                    good_output=self.pms_info[pm]['output'],
+                    workforce=self.pms_info[pm]['workscale'],
+                    children=[]
+                ))
+            else:
+                print(f"{pm}无定义")
         return pms_list
-
-    @staticmethod
-    # ! 生成树要使用的通用工具
-    def get_config_file_paths(folder_name: str):
-        file_paths = {}
-
-        # TODO 等完成了重构再考虑Mod的事情
-        # input_folder_path = os.path.join(MODFILE_FOLDER, folder_name)
-        # if folder_name in self.list_replace_path and self.list_replace_path != '':
-        #     if os.path.exists(input_folder_path):
-        #         for root, _, files in os.walk(input_folder_path):
-        #             for file in files:
-        #                 file_paths[file] = os.path.join(root, file)
-        #         return list(file_paths.values())
-
-        # 读取vanilla文件夹内的文件
-        vanilla_folder_path = os.path.join(VANILLA_FOLDER, folder_name)
-        for root, _, files in os.walk(vanilla_folder_path):
-            for file in files:
-                file_paths[file] = os.path.join(root, file)
-
-        # 检查input文件夹内是否有相同文件并替换
-
-        # if os.path.exists(input_folder_path):
-        #     for root, _, files in os.walk(input_folder_path):
-        #         for file in files:
-        #             file_paths[file] = os.path.join(root, file)
-
-        return list(file_paths.values())
-
-    def extract_all_from_config_file_paths(self, path: str) -> str:
-        """
-        组合给定路径下的所有非.info文件，然后将他们以字符串类型输出
-        :param path: 给定的路径
-        :return : 组合后的字符串
-        """
-        content = ""
-        list_file_path = self.get_config_file_paths(path)
-        if list_file_path:
-            for file_path in list_file_path:
-                if not file_path.endswith(".info"):
-                    with open(file_path, "r", encoding="utf-8-sig") as f:
-                        content += f.read()
-                        # 额外加一个\n，确保位于行首的字符依然位于行首
-                        content += "\n"
-        else:
-            print(f"找不到{path}，请确认游戏路径是否设置正确")
-        return content
-
-    def extract_all_from_config_file_paths_without_notes(self, path: str) -> str:
-        """
-        txt_combiner的移除注释版本，仅移除#后的内容，不要在处理本地化文件的时候使用这个！
-        :param path: 给定的路径
-        :return: 组合后的字符串
-        """
-        return re.sub(r"#.*$", "", self.extract_all_from_config_file_paths(path), flags=re.MULTILINE)
-
-    @staticmethod
-    def _extract_bracket_content(text: str, start: int, char: str):
-        """
-        提取给定字符之间的内容
-        :param text: 待检索文本
-        :param start: 字符开始位置
-        :param char: 待匹配字符
-        :return: 字符之间的字符串（包括两端）
-        """
-        if char in ["{", "[", "("]:
-            open_bracket = char
-            close_bracket = {"{": "}", "[": "]", "(": ")"}[char]
-            stack = []
-            first_open_bracket_pos = -1  # 用于保存第一个open_bracket的位置
-            for i in range(start, len(text)):
-                if text[i] == open_bracket:
-                    if first_open_bracket_pos == -1:
-                        first_open_bracket_pos = i
-                    stack.append(i)
-                elif text[i] == close_bracket:
-                    stack.pop()
-                    if not stack:
-                        return text[start:first_open_bracket_pos - 1], text[first_open_bracket_pos + 1:i]  # 不包括两端的括号
-        elif char in ["\"", "\'"]:
-            first_quote_pos = text.find(char, start)  # 捕获第一个引号的位置
-            if first_quote_pos != -1:
-                end = text.find(char, first_quote_pos + 1)
-                if end != -1:
-                    return text[start:first_quote_pos - 1], text[first_quote_pos + 1:end]
-        return None
-
-    def extract_blocks_to_dict(self, path: str) -> dict:
-        """
-        extract_all_blocks的快捷版本，以path为输入，专门处理<str> = {<content>}格式的代码块
-        :param path: 文件路径
-        :return: <str>：<content>格式的字典
-        """
-        content = self.extract_all_from_config_file_paths_without_notes(path)  # 此处会移除注释
-        return self.extract_all_blocks(BLOCK_PATTERN_0, content, "{")
-
-    def extract_all_blocks(self, pattern: str, text: str, char: str) -> dict:
-        """
-        提取<str> = {<content>}格式的代码块
-        对于{、[或(，会匹配第一个匹配的}、]或)，"或'则只会匹配下一个"或'
-        以<str>：<content>的字典形式返回
-        :param pattern: 代码块开头<str> = {的格式
-        :param text: 待检索的文本
-        :param char: 待配对的字符类型，只能是{、[、(、"或‘
-        :return: <str>：<content>格式的字典
-        """
-        dict_block = {}
-        for match in re.finditer(pattern, text, re.MULTILINE):
-            name, block = self._extract_bracket_content(text, match.start(), char)
-            name = re.compile(NAME_PATTERN).search(name).group(0) if re.compile(NAME_PATTERN).search(name) else "None"
-            if block:
-                if name in dict_block.keys():
-                    print(f"{name}重复出现")
-                dict_block[name] = block
-        return dict_block
-
-    def extract_one_block(self, str_name: str, text: str):
-        """
-        只会提取一个特定的block
-        :param str_name: block的name
-        :param text: 待提取文本
-        :return: 提取出的block
-        """
-        one_block_pattern = BLOCK_PATTERN_CUS.format(str_name)
-        match = re.search(one_block_pattern, text)
-        if not match:
-            return None
-        _, block = self._extract_bracket_content(text, match.start(), "{")
-        return block
-
-    @staticmethod
-    def get_numeric_attribute(name: str, text: str):
-        """
-        输入数字类型属性的名称和待查询文本，输出属性的值
-        :param name: 属性的名称
-        :param text: 待查询文本
-        :return: 属性的值
-        """
-        if name.startswith("_"):
-            start = ""
-        else:
-            start = "\\b"
-        na_pattern = re.compile(f"{start}{name}{NUMERIC_ATTRIBUTE_PATTERN}")
-        match = na_pattern.search(text)
-        if match:
-            return match.group(1)
-        else:
-            return None
-
-    @staticmethod
-    def get_non_numeric_attribute(name: str, text: str):
-        if name.startswith("_"):
-            start = ""
-        else:
-            start = "\\b"
-        na_pattern = re.compile(f"{start}{name}{NON_NUMERIC_ATTRIBUTE_PATTERN}")
-        match = na_pattern.search(text)
-        if match:
-            return match.group(1)
-        else:
-            return None
