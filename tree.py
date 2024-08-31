@@ -186,7 +186,6 @@ class BuildingInfoTree:
         return workforce_info_dict
 
     # ! 按建筑-生产方式群-生产方式创建信息树
-    # TODO 重构生成树代码
     def generate_tree(self):
         tree_list = self.parse_buildings()
         return tree_list
