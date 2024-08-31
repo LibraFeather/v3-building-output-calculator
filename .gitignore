@@ -1,5 +1,10 @@
-input/
-output/
+# 忽略文件夹
+_input/
+_output/
 .vscode/
-__pycache__/
 .idea/
+__pycache__/
+
+
+# 忽略文件
+test.py
