@@ -11,15 +11,17 @@ import utils.textproc as tp
 import utils.test as t
 
 # TODO 按照类型排列
-from constants.constant import GOODS_PATH, POP_TYPES_PATH, BUILDING_COST_CONVERT_DICT, BUILDINGS_PATH, PMG_PATH, \
-    PM_PATH, LOCALIZATION_PATH
-from constants.pattern import TREE_FINDCHILD_PATTERN, PM_GOODS_INFO_PATTERN, PM_GOODS_PATTERN, PM_EMPLOYMENT_PATTERN, \
-    PM_EMPLOYMENT_TYPE_PATTERN, LOCALIZATION_PATTERN, LOCALIZATION_REPLACE_PATTERN
+from constants.path import GOODS_PATH, POP_TYPES_PATH, BUILDINGS_PATH, PMG_PATH, PM_PATH, LOCALIZATION_PATH, \
+    SCRIPT_VALUE_PATH
+from constants.str import COST_STR, WAGE_WEIGHT_STR, REQUIRED_CONSTRUCTION_STR, PRODUCTION_METHOD_GROUPS_STR, \
+    PRODUCTION_METHODS_STR, BUILDING_MODIFIERS_STR, WORKFORCE_SCALED_STR, LEVEL_SCALED_STR
+from constants.pattern import LOCALIZATION_PATTERN, LOCALIZATION_REPLACE_PATTERN
 from models.model import NormalNode, BuildingNode, PMNode
 
 
 class BuildingInfoTree:
     def __init__(self) -> None:
+        self.scrit_value_info = self.__get_scrit_value_info()
         self.goods_info = self.__get_goods_info()
         self.pop_types_info = self.__get_pops_info()
         self.buildings_info = self.__get_buildings_info()
@@ -29,114 +31,121 @@ class BuildingInfoTree:
 
         self.tree = self.generate_tree()
 
+    @staticmethod
+    def __get_scrit_value_info() -> dict:
+        return tp.get_nested_dict_from_path(SCRIPT_VALUE_PATH)
+
     # ! 预备部分，创建各项存储字典
     @staticmethod
     def __get_goods_info() -> dict:
         """
-        两列数据：商品名称和基础价格
+        商品名称: 基础价格
         """
-        dict_good_blocks = tp.extract_blocks_to_dict(GOODS_PATH)
+        good_blocks_dict = tp.get_nested_dict_from_path(GOODS_PATH)
         goods_dict = {}
-        for good, good_block in dict_good_blocks.items():
-            cost = tp.get_numeric_attribute("cost", good_block)
-            if cost is None:
-                print(f"找不到{good}的基础价格，因此{good}将被忽略")
-                continue
-            # 价格是整数，为了兼容性考虑，这里记为浮点数
-            goods_dict[good] = float(cost)
+        for good in good_blocks_dict:
+            if COST_STR in good_blocks_dict[good]:
+                goods_dict[good] = float(good_blocks_dict[good][COST_STR])
+            else:
+                goods_dict[good] = 0.0
+                print(f"未找到{good}的{COST_STR}，因此假定其为0.0")
         return goods_dict
 
     @staticmethod
     def __get_pops_info() -> dict:
         """
-        两列数据：pop类型/工资权重
+        pop类型: 工资权重
         """
-        dict_pop_blocks = tp.extract_blocks_to_dict(POP_TYPES_PATH)
+        pop_blocks_dict = tp.get_nested_dict_from_path(POP_TYPES_PATH)
         pops_dict = {}
-        for pop_type, pop_type_block in dict_pop_blocks.items():
-            wage_weight = tp.get_numeric_attribute("wage_weight", pop_type_block)
-            if wage_weight is None:
-                wage_weight = 0
-                print(f"未找到{pop_type}的wage_weight，因此假定为0")
-            pops_dict[pop_type] = float(wage_weight)
+        for pop_type in pop_blocks_dict:
+            if WAGE_WEIGHT_STR in pop_blocks_dict[pop_type]:
+                pops_dict[pop_type] = float(pop_blocks_dict[pop_type][WAGE_WEIGHT_STR])
+            else:
+                pops_dict[pop_type] = 0.0
+                print(f"未找到{pop_type}的{WAGE_WEIGHT_STR}，因此假定其为0.0")
         return pops_dict
 
     def __get_buildings_info(self) -> dict:
+        """
+        建筑: 建造花费， 生产方式组
+        """
+
+        def building_cost_converter(building_cost_str):
+            if isinstance(building_cost_str, str):
+                if building_cost_str not in self.scrit_value_info:
+                    print(f"{building_cost_str}无定义，假定为0.0")
+                    return 0.0
+                if not isinstance(self.scrit_value_info[building_cost_str], (int, float)):
+                    print(f"{building_cost_str}的值{self.scrit_value_info[building_cost_str]}不是数值，假定为0.0")
+                    return 0.0
+                return self.scrit_value_info[building_cost_str]
+            if isinstance(building_cost_str, (int, float)):
+                return building_cost_str
+            print(f"{building_cost_str}格式异常，假定为0.0")
+            return 0.0
+
         buildings_dict = {}
-        building_blocks_dict = tp.extract_blocks_to_dict(BUILDINGS_PATH)
-
-        for building, building_block in building_blocks_dict.items():
-            building_cost_str = tp.get_non_numeric_attribute("required_construction", building_block)
-            building_cost = self.__building_cost_converter(building_cost_str)
-            pmg_block = tp.extract_one_block("production_method_groups", building_block)
-            if pmg_block is None:
+        building_blocks_dict = tp.get_nested_dict_from_path(BUILDINGS_PATH)
+        for building in building_blocks_dict:
+            if REQUIRED_CONSTRUCTION_STR in building_blocks_dict[building]:
+                building_cost = building_cost_converter(
+                    building_blocks_dict[building][REQUIRED_CONSTRUCTION_STR])
+            else:
+                building_cost = 0.0
+                print(f"未找到{building}的{REQUIRED_CONSTRUCTION_STR}，因此假定其为0.0")
+            if PRODUCTION_METHOD_GROUPS_STR in building_blocks_dict[building]:
+                pmgs_list = building_blocks_dict[building][PRODUCTION_METHOD_GROUPS_STR]
+            else:
+                pmgs_list = []
                 print(f"{building}格式异常，未找到任何生产方式组")
-            pmg_block_split = re.compile(TREE_FINDCHILD_PATTERN).findall(pmg_block)
-            buildings_dict[building] = {'cost': building_cost, 'pmgs': pmg_block_split}
-
+            buildings_dict[building] = {'cost': building_cost, 'pmgs': pmgs_list}
         return buildings_dict
 
     @staticmethod
     def __get_pmgs_info() -> dict:
-        dict_pmg_blocks = tp.extract_blocks_to_dict(PMG_PATH)
+        """
+        生产方式组: 生产方式
+        """
+        pmg_blocks_dict = tp.get_nested_dict_from_path(PMG_PATH)
         pmgs_dict = {}
-        for pmg, pmg_block in dict_pmg_blocks.items():
-            pm_block = tp.extract_one_block("production_methods", pmg_block)
-            if pm_block is None:
-                print(f"{pmg}格式异常，因此无法找到任何生产方式")
-                continue
-            pms_list = []
-            for pm in re.compile(TREE_FINDCHILD_PATTERN).findall(pm_block):
-                pms_list.append(pm)
+        for pmg in pmg_blocks_dict:
+            if PRODUCTION_METHODS_STR in pmg_blocks_dict[pmg]:
+                pms_list = pmg_blocks_dict[pmg][PRODUCTION_METHODS_STR]
+            else:
+                pms_list = []
+                print(f"{pmg}格式异常，未找到任何生产方式")
             pmgs_dict[pmg] = pms_list
         return pmgs_dict
 
     def __get_pms_info(self) -> dict:
-        """
-        获取生产方式的字典
-        :return : 生产方式的字典
-        """
-        dict_pm_blocks = tp.extract_blocks_to_dict(PM_PATH)
-        dict_pm = {}
-        for pm, pm_block in dict_pm_blocks.items():
-            dict_pm[pm] = {}
-            dict_pm[pm]['input'] = self.__add_good_info_for_pm(pm, pm_block, 'input')
-            dict_pm[pm]['output'] = self.__add_good_info_for_pm(pm, pm_block, 'output')
-            dict_pm[pm]['workscale'] = self.__add_employment_info_for_pm(pm, pm_block)
-        return dict_pm
-
-    @staticmethod
-    def __building_cost_converter(building_cost_str):
-        if building_cost_str in BUILDING_COST_CONVERT_DICT.keys():
-            return BUILDING_COST_CONVERT_DICT[building_cost_str]
-        else:
-            return 0.0
-
-    def __add_good_info_for_pm(self, pm, pm_block, io_type) -> dict:
-        goods_info_str_list = re.findall(PM_GOODS_INFO_PATTERN.format(io_type), pm_block)
-        goods_info_dict = {}
-        for goods_input in goods_info_str_list:
-            matched_good_str = re.compile(PM_GOODS_PATTERN).search(goods_input)
-            if not matched_good_str:
-                print(f"{pm}中的{goods_input}格式异常，无法捕获商品名称")
+        pm_blocks_dict = tp.get_nested_dict_from_path(PM_PATH)
+        pms_dict = {}
+        for pm in pm_blocks_dict:
+            pms_dict[pm] = {"input": {}, "output": {}, "workscale": {}}
+            if BUILDING_MODIFIERS_STR not in pm_blocks_dict[pm]:
+                print(f"{pm}中缺少{BUILDING_MODIFIERS_STR}")
                 continue
-            good = matched_good_str.group(1)
-            am_type = matched_good_str.group(2)  # add 或 mult
-            if am_type not in ["add", "mult"]:
-                print(f"{pm}中的{goods_input}格式异常，无法确认add或mult")
-                continue
-            # 确保商品存在于商品的字典中
-            if good not in self.goods_info.keys():
-                print(f"未找到{pm}中{good}的定义")
-                continue
-            number = tp.get_numeric_attribute(f"_{am_type}", goods_input)
-            if number is None:
-                print(f"{pm}中的{goods_input}格式异常，无法捕获{good}的{io_type}数量")
-                continue
-            # 商品数量大部分都是整数，但是自给农场是小数，这里统一以浮点数记录
-            number = float(number)
-            goods_info_dict[good] = number
-        return goods_info_dict
+            if WORKFORCE_SCALED_STR in pm_blocks_dict[pm][BUILDING_MODIFIERS_STR]:
+                good_modifiers_dict = dict(pm_blocks_dict[pm][BUILDING_MODIFIERS_STR][WORKFORCE_SCALED_STR])
+                good_modifiers_list = tp.parse_good_modifier_dict(good_modifiers_dict)
+                for good_modifier in good_modifiers_list:
+                    if good_modifier[2] == "add":  # 只允许add类modifier
+                        if good_modifier[1] not in self.goods_info:
+                            print(f"未找到{pm}中{good_modifier[1]}的定义")
+                            continue
+                        pms_dict[pm][good_modifier[0]][good_modifier[1]] = good_modifier[3]
+            if LEVEL_SCALED_STR in pm_blocks_dict[pm][BUILDING_MODIFIERS_STR]:
+                building_employment_modifiers_dict = dict(pm_blocks_dict[pm][BUILDING_MODIFIERS_STR][LEVEL_SCALED_STR])
+                building_employment_modifiers_list = tp.parse_building_employment_modifier_dict(
+                    building_employment_modifiers_dict)
+                for building_employment_modifier in building_employment_modifiers_list:
+                    if building_employment_modifier[1] == "add":
+                        if building_employment_modifier[0] not in self.pop_types_info:
+                            print(f"未找到{pm}中{building_employment_modifier[0]}的定义")
+                            continue
+                        pms_dict[pm]["workscale"][building_employment_modifier[0]] = building_employment_modifier[2]
+        return pms_dict
 
     def __get_localization_info(self) -> dict:
         content = tp.txt_combiner(LOCALIZATION_PATH)
@@ -170,27 +179,6 @@ class BuildingInfoTree:
 
         return localization_dict_used
 
-    def __add_employment_info_for_pm(self, pm, pm_block) -> dict:
-        list_workforce_add = re.compile(PM_EMPLOYMENT_PATTERN).findall(pm_block)
-        workforce_info_dict = {}
-        for workforce_add in list_workforce_add:
-            match_workforce = re.compile(PM_EMPLOYMENT_TYPE_PATTERN).search(workforce_add)
-            if not match_workforce:
-                print(f"{pm}中的{workforce_add}格式异常，无法捕获人群名称")
-                continue
-            workforce = match_workforce.group(1)
-            if workforce not in self.pop_types_info.keys():
-                print(f"未找到{pm}中{workforce}的定义")
-                continue
-            number = tp.get_numeric_attribute("_add", workforce_add)
-            if number is None:
-                print(f"未找到{pm}中{workforce}的数量")
-                continue
-            # 劳动力数量应该是整数
-            number = int(number)
-            workforce_info_dict[workforce] = number
-        return workforce_info_dict
-
     # ! 按建筑-生产方式群-生产方式创建信息树
     def generate_tree(self):
         tree_list = self.parse_buildings()
@@ -200,8 +188,8 @@ class BuildingInfoTree:
         buildings_list = []
         for building, building_info in self.buildings_info.items():
             buildings_list.append(BuildingNode(
-                name=building,
-                localization_key=self.localization_info[building],
+                localization_key=building,
+                localization_value=self.localization_info[building],
                 children=self.parse_pmgs(building_info['pmgs']),
                 building_cost=building_info['cost']
             ))
@@ -213,8 +201,8 @@ class BuildingInfoTree:
         for pmg in pmgs:
             if pmg in self.pmgs_info:
                 pmgs_list.append(NormalNode(
-                    name=pmg,
-                    localization_key=self.localization_info[pmg],
+                    localization_key=pmg,
+                    localization_value=self.localization_info[pmg],
                     children=self.parse_pms(self.pmgs_info[pmg])
                 ))
             else:
@@ -227,8 +215,8 @@ class BuildingInfoTree:
         for pm in pms:
             if pm in self.pms_info:
                 pms_list.append(PMNode(
-                    name=pm,
-                    localization_key=self.localization_info[pm],
+                    localization_key=pm,
+                    localization_value=self.localization_info[pm],
                     good_input=self.pms_info[pm]['input'],
                     good_output=self.pms_info[pm]['output'],
                     workforce=self.pms_info[pm]['workscale'],

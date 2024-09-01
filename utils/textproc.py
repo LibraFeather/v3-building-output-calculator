@@ -371,3 +371,84 @@ def get_nested_dict_from_text(text: str, override=True) -> dict:
     nested_dict = divide_text_into_dict(text, override)
     nested_dict = divide_dict_value(nested_dict)
     return nested_dict
+
+
+# ------------------------------------------------------------------------------------------
+# 一下函数用于解析good modifier
+def parse_good_modifier(good_modifier: str):
+    """
+    返回值为 input/output，商品名称，add/mult
+    """
+
+    def wrong_format():
+        print(f"{good_modifier}存在格式错误")
+        return None
+
+    split_list = good_modifier.split("_")
+    if len(split_list) < 4:
+        return wrong_format()
+    if split_list[0] != "goods":
+        return wrong_format()
+    if split_list[1] not in ["input", "output"]:
+        return wrong_format()
+    if split_list[-1] not in ["add", "mult"]:
+        return wrong_format()
+    io_type = split_list[1]
+    good = "_".join(split_list[2:-1])
+    am_type = split_list[-1]
+    return io_type, good, am_type
+
+
+def parse_good_modifier_dict(good_modifiers_dict: dict) -> list:
+    """
+    返回值为[input/output, 商品名称, add/mult, 数值]的列表
+    """
+    good_modifier_list = []
+    for good_modifier, value in good_modifiers_dict.items():
+        good_modifier_tuple = parse_good_modifier(good_modifier)
+        if good_modifier_tuple is None:
+            continue
+        if not isinstance(value, (int, float)):
+            print(f"{good_modifier}的值{value}不是数值")
+            continue
+        good_modifier_list.append([*good_modifier_tuple, float(value)])
+    return good_modifier_list
+
+
+# ------------------------------------------------------------------------------------------
+# 一下函数用于解析building employment modifier
+def parse_building_employment_modifier(building_employment_modifier: str):
+    """
+    返回值为 pop类型，add/mult
+    """
+
+    def wrong_format():
+        print(f"{building_employment_modifier}存在格式错误")
+        return None
+
+    split_list = building_employment_modifier.split("_")
+    if len(split_list) < 4:
+        return wrong_format()
+    if "_".join(split_list[:2]) != "building_employment":
+        return wrong_format()
+    if split_list[-1] not in ["add", "mult"]:
+        return wrong_format()
+    pop_type = "_".join(split_list[2:-1])
+    am_type = split_list[-1]
+    return pop_type, am_type
+
+
+def parse_building_employment_modifier_dict(building_employment_modifier_dict: dict) -> list:
+    """
+    返回值为[pop类型, add/mult, 数值]的列表
+    """
+    building_employment_list = []
+    for building_employment_modifier, value in building_employment_modifier_dict.items():
+        building_employment_modifier_tuple = parse_building_employment_modifier(building_employment_modifier)
+        if building_employment_modifier_tuple is None:
+            continue
+        if not isinstance(value, (int, float)):
+            print(f"{building_employment_modifier}的值{value}不是数值")
+            continue
+        building_employment_list.append([*building_employment_modifier_tuple, float(value)])
+    return building_employment_list

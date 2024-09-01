@@ -1,4 +1,6 @@
 # 处理本地化的类
+# TODO 待更新
+
 class Localization:
     """
     用于处理本地化

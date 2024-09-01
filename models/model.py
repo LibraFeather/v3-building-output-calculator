@@ -4,8 +4,8 @@ from dataclasses import dataclass
 # 生产方式群应用此类节点
 @dataclass
 class NormalNode:
-    name: str
     localization_key: str
+    localization_value: str
     children: list
 
 

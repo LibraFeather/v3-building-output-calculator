@@ -15,7 +15,7 @@ class Calculator:
 
     def __generate_info_dict_for_single_building(self, building):
         building_info_list = []
-        pmgs_localization_list = [pmg.localization_key for pmg in building.children]
+        pmgs_localization_list = [pmg.localization_value for pmg in building.children]
         combinations = itertools.product(*(node.children for node in building.children))
 
         for combination in combinations:
@@ -34,7 +34,7 @@ class Calculator:
 
         one_line_data = {'good_input': Counter(), 'good_output': Counter(), 'workforce': Counter()}
         for i in range(len(pmgs_localization_list)):
-            one_line_data[pmgs_localization_list[i]] = combination[i].localization_key
+            one_line_data[pmgs_localization_list[i]] = combination[i].localization_value
             one_line_data['good_input'].update(combination[i].good_input)
             one_line_data['good_output'].update(combination[i].good_output)
             one_line_data['workforce'].update(combination[i].workforce)
@@ -90,9 +90,9 @@ class Calculator:
             'wage_weight': '工资倍率'
         }
         building_info_df.rename(columns=column_headers, inplace=True)
-        building_info_df.iloc[:, 3:].to_excel(f'{OUTPUT_PATH}\\buildings\\{building.localization_key}_{building.name}.xlsx',
+        building_info_df.iloc[:, 3:].to_excel(f'{OUTPUT_PATH}\\buildings\\{building.localization_value}_{building.localization_key}.xlsx',
                                               index=False)
-        print(f'{building.localization_key}_{building.name}输出成功！')
+        print(f'{building.localization_value}_{building.localization_key}输出成功！')
 
     def output_every_building(self):
         for building in self.building_info_tree:
