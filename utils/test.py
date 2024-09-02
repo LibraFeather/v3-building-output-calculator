@@ -2,7 +2,7 @@
 import json
 import os
 
-from config.path import OUTPUT_PATH
+from constants.path import OUTPUT_PATH
 
 
 # ------------------------------------------------------------------------------------------

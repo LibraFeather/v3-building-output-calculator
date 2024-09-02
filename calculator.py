@@ -3,7 +3,7 @@ import itertools
 from collections import Counter
 
 from tree import BuildingInfoTree
-from config.path import OUTPUT_PATH
+from constants.path import OUTPUT_PATH
 
 
 class Calculator:

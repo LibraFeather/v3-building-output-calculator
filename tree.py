@@ -7,16 +7,19 @@ Calista C.Manstainne 于2024.8.24开始重构
 """
 
 import re
+from collections import Counter
+
 import utils.textproc as tp
-import utils.test as t
 
 # TODO 按照类型排列
 from constants.path import GOODS_PATH, POP_TYPES_PATH, BUILDINGS_PATH, PMG_PATH, PM_PATH, LOCALIZATION_PATH, \
     SCRIPT_VALUE_PATH
 from constants.str import COST_STR, WAGE_WEIGHT_STR, REQUIRED_CONSTRUCTION_STR, PRODUCTION_METHOD_GROUPS_STR, \
     PRODUCTION_METHODS_STR, BUILDING_MODIFIERS_STR, WORKFORCE_SCALED_STR, LEVEL_SCALED_STR
-from constants.pattern import LOCALIZATION_PATTERN, LOCALIZATION_REPLACE_PATTERN
 from models.model import NormalNode, BuildingNode, PMNode
+
+LOCALIZATION_PATTERN = r"^\s+[\w\-.]+:.+"
+LOCALIZATION_REPLACE_PATTERN = r"\$([\w\-.]+)\$"
 
 
 class BuildingInfoTree:
@@ -124,34 +127,36 @@ class BuildingInfoTree:
         for pm in pm_blocks_dict:
             pms_dict[pm] = {"input": {}, "output": {}, "workscale": {}}
             if BUILDING_MODIFIERS_STR not in pm_blocks_dict[pm]:
-                print(f"{pm}中缺少{BUILDING_MODIFIERS_STR}")
+                # print(f"{pm}中缺少{BUILDING_MODIFIERS_STR}")
                 continue
+
+            modifier_dict = Counter()
             if WORKFORCE_SCALED_STR in pm_blocks_dict[pm][BUILDING_MODIFIERS_STR]:
-                good_modifiers_dict = dict(pm_blocks_dict[pm][BUILDING_MODIFIERS_STR][WORKFORCE_SCALED_STR])
-                good_modifiers_list = tp.parse_good_modifier_dict(good_modifiers_dict)
-                for good_modifier in good_modifiers_list:
-                    if good_modifier[2] == "add":  # 只允许add类modifier
-                        if good_modifier[1] not in self.goods_info:
-                            print(f"未找到{pm}中{good_modifier[1]}的定义")
-                            continue
-                        pms_dict[pm][good_modifier[0]][good_modifier[1]] = good_modifier[3]
+                modifier_dict.update(tp.calibrate_modifier_dict(dict(pm_blocks_dict[pm][BUILDING_MODIFIERS_STR][WORKFORCE_SCALED_STR])))  # 防止空值
             if LEVEL_SCALED_STR in pm_blocks_dict[pm][BUILDING_MODIFIERS_STR]:
-                building_employment_modifiers_dict = dict(pm_blocks_dict[pm][BUILDING_MODIFIERS_STR][LEVEL_SCALED_STR])
-                building_employment_modifiers_list = tp.parse_building_employment_modifier_dict(
-                    building_employment_modifiers_dict)
-                for building_employment_modifier in building_employment_modifiers_list:
-                    if building_employment_modifier[1] == "add":
-                        if building_employment_modifier[0] not in self.pop_types_info:
-                            print(f"未找到{pm}中{building_employment_modifier[0]}的定义")
+                modifier_dict.update(tp.calibrate_modifier_dict(dict(pm_blocks_dict[pm][BUILDING_MODIFIERS_STR][LEVEL_SCALED_STR])))
+            modifier_dict = tp.parse_modifier_dict(dict(modifier_dict))
+            for modifier, modifier_info in modifier_dict.items():
+                if modifier_info["am_type"] != "add":  # 暂时只允许add类modifier
+                    print(f"{pm}的{modifier}的{modifier_info["am_type"]}不是add，因此被忽略")
+                    continue
+                match modifier_info["category"]:
+                    case "goods":
+                        if modifier_info["key_word"] not in self.goods_info:
+                            print(f"未找到{pm}中{modifier_info["key_word"]}的定义")
                             continue
-                        pms_dict[pm]["workscale"][building_employment_modifier[0]] = building_employment_modifier[2]
+                        pms_dict[pm][modifier_info["io_type"]][modifier_info["key_word"]] = modifier_info["value"]
+                    case "building_employment":
+                        if modifier_info["key_word"] not in self.pop_types_info:
+                            print(f"未找到{pm}中{modifier_info["key_word"]}的定义")
+                            continue
+                        pms_dict[pm]["workscale"][modifier_info["key_word"]] = modifier_info["value"]
+
         return pms_dict
 
     def __get_localization_info(self) -> dict:
         content = tp.txt_combiner(LOCALIZATION_PATH)
-        t.output_to_test_txt(content)
         localization_dict_all = tp.extract_all_blocks(LOCALIZATION_PATTERN, content, "\"")
-        t.output_to_test_json(localization_dict_all)
 
         localization_keys_used = list(self.buildings_info.keys()) + list(self.pmgs_info.keys()) + list(
             self.pms_info.keys())
@@ -179,6 +184,7 @@ class BuildingInfoTree:
 
         return localization_dict_used
 
+    # ------------------------------------------------------------------------------------------
     # ! 按建筑-生产方式群-生产方式创建信息树
     def generate_tree(self):
         tree_list = self.parse_buildings()

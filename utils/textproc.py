@@ -10,6 +10,10 @@ NUMERIC_ATTRIBUTE_PATTERN = r"\s*=\s*([\d\-.]+)"  # 用于捕获数字类型的�
 NON_NUMERIC_ATTRIBUTE_PATTERN = r"\s*=\s*([\w\-.]+)"
 OPERATOR_PATTERN = re.compile(r"(<|<=|=|>=|>)")
 
+GOOD_MODIFIER_PATTERN = re.compile(r"\bgoods_(?P<io_type>input|output)_(?P<key_word>[\w\-]+?)_(?P<am_type>add|mult)\b")
+BUILDING_EMPLOYMENT_MODIFIER_PATTERN = re.compile(
+    r"\bbuilding_employment_(?P<key_word>[\w\-]+?)_(?P<am_type>add|mult)\b")
+
 # 其他变量
 list_logic_keys = ["if", "else_if", "else", "add", "multiply", "divide"]
 
@@ -374,81 +378,71 @@ def get_nested_dict_from_text(text: str, override=True) -> dict:
 
 
 # ------------------------------------------------------------------------------------------
-# 一下函数用于解析good modifier
-def parse_good_modifier(good_modifier: str):
-    """
-    返回值为 input/output，商品名称，add/mult
-    """
+def wrong_format(modifier_name: str):
+    print(f"{modifier_name}存在格式错误")
+    return None
 
-    def wrong_format():
-        print(f"{good_modifier}存在格式错误")
+
+# 以下函数用于解析modifier
+def parse_good_modifier(modifier: str):
+    modifier_match = GOOD_MODIFIER_PATTERN.match(modifier)
+    if modifier_match is None:
+        return wrong_format(modifier)
+    else:
+        return {
+            "category": "goods",
+            "key_word": modifier_match.group("key_word"),
+            "io_type": modifier_match.group("io_type"),
+            "am_type": modifier_match.group("am_type")
+        }
+
+
+def parse_building_modifier(modifier: str):  # TODO 这个函数仅能识别buildings_employment_开头的modifier，之后也许可以升级
+    modifier_match = BUILDING_EMPLOYMENT_MODIFIER_PATTERN.match(modifier)
+    if modifier_match is None:
         return None
-
-    split_list = good_modifier.split("_")
-    if len(split_list) < 4:
-        return wrong_format()
-    if split_list[0] != "goods":
-        return wrong_format()
-    if split_list[1] not in ["input", "output"]:
-        return wrong_format()
-    if split_list[-1] not in ["add", "mult"]:
-        return wrong_format()
-    io_type = split_list[1]
-    good = "_".join(split_list[2:-1])
-    am_type = split_list[-1]
-    return io_type, good, am_type
+    else:
+        return {
+            "category": "building_employment",
+            "key_word": modifier_match.group("key_word"),
+            "am_type": modifier_match.group("am_type")
+        }
 
 
-def parse_good_modifier_dict(good_modifiers_dict: dict) -> list:
-    """
-    返回值为[input/output, 商品名称, add/mult, 数值]的列表
-    """
-    good_modifier_list = []
-    for good_modifier, value in good_modifiers_dict.items():
-        good_modifier_tuple = parse_good_modifier(good_modifier)
-        if good_modifier_tuple is None:
+def parse_modifier(modifier: str):
+    split_list = modifier.split("_")
+    if len(split_list) < 3:  # modifier应该至少3个单位长
+        return wrong_format(modifier)
+
+    match split_list[0]:
+        case "goods":
+            return parse_good_modifier(modifier)
+        case "building":
+            return parse_building_modifier(modifier)
+        case _:
+            return wrong_format(modifier)
+
+
+def parse_modifier_dict(modifier_dict: dict) -> dict:
+    modifier_info_dict = {}
+    for modifier, value in modifier_dict.items():
+        modifier_info = parse_modifier(modifier)
+        if modifier_info is None:
             continue
         if not isinstance(value, (int, float)):
-            print(f"{good_modifier}的值{value}不是数值")
+            print(f"{modifier}的值{value}不是数值")
             continue
-        good_modifier_list.append([*good_modifier_tuple, float(value)])
-    return good_modifier_list
+        modifier_info["value"] = value
+        modifier_info_dict[modifier] = modifier_info
+    return modifier_info_dict
+
+
+def calibrate_modifier_dict(modifier_dict: dict) -> dict:
+    for modifier, value in modifier_dict.items():
+        if isinstance(value, list):
+            modifier_dict[modifier] = float(sum(value))
+    return modifier_dict
 
 
 # ------------------------------------------------------------------------------------------
-# 一下函数用于解析building employment modifier
-def parse_building_employment_modifier(building_employment_modifier: str):
-    """
-    返回值为 pop类型，add/mult
-    """
-
-    def wrong_format():
-        print(f"{building_employment_modifier}存在格式错误")
-        return None
-
-    split_list = building_employment_modifier.split("_")
-    if len(split_list) < 4:
-        return wrong_format()
-    if "_".join(split_list[:2]) != "building_employment":
-        return wrong_format()
-    if split_list[-1] not in ["add", "mult"]:
-        return wrong_format()
-    pop_type = "_".join(split_list[2:-1])
-    am_type = split_list[-1]
-    return pop_type, am_type
-
-
-def parse_building_employment_modifier_dict(building_employment_modifier_dict: dict) -> list:
-    """
-    返回值为[pop类型, add/mult, 数值]的列表
-    """
-    building_employment_list = []
-    for building_employment_modifier, value in building_employment_modifier_dict.items():
-        building_employment_modifier_tuple = parse_building_employment_modifier(building_employment_modifier)
-        if building_employment_modifier_tuple is None:
-            continue
-        if not isinstance(value, (int, float)):
-            print(f"{building_employment_modifier}的值{value}不是数值")
-            continue
-        building_employment_list.append([*building_employment_modifier_tuple, float(value)])
-    return building_employment_list
+# 以下函数待清理
