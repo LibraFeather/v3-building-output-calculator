@@ -32,6 +32,8 @@ class BuildingInfoTree:
         self.pms_info = self.__get_pms_info()
         self.localization_info = self.__get_localization_info()
 
+        self.automation_pm_list = self.__get_automation_pm_list()
+
         self.tree = self.generate_tree()
 
     @staticmethod
@@ -96,7 +98,7 @@ class BuildingInfoTree:
                     building_blocks_dict[building][REQUIRED_CONSTRUCTION_STR])
             else:
                 building_cost = 0.0
-                print(f"未找到{building}的{REQUIRED_CONSTRUCTION_STR}，因此假定其为0.0")
+                # print(f"未找到{building}的{REQUIRED_CONSTRUCTION_STR}，因此假定其为0.0")
             if PRODUCTION_METHOD_GROUPS_STR in building_blocks_dict[building]:
                 pmgs_list = building_blocks_dict[building][PRODUCTION_METHOD_GROUPS_STR]
             else:
@@ -132,9 +134,11 @@ class BuildingInfoTree:
 
             modifier_dict = Counter()
             if WORKFORCE_SCALED_STR in pm_blocks_dict[pm][BUILDING_MODIFIERS_STR]:
-                modifier_dict.update(tp.calibrate_modifier_dict(dict(pm_blocks_dict[pm][BUILDING_MODIFIERS_STR][WORKFORCE_SCALED_STR])))  # 防止空值
+                modifier_dict.update(tp.calibrate_modifier_dict(
+                    dict(pm_blocks_dict[pm][BUILDING_MODIFIERS_STR][WORKFORCE_SCALED_STR])))  # 防止空值
             if LEVEL_SCALED_STR in pm_blocks_dict[pm][BUILDING_MODIFIERS_STR]:
-                modifier_dict.update(tp.calibrate_modifier_dict(dict(pm_blocks_dict[pm][BUILDING_MODIFIERS_STR][LEVEL_SCALED_STR])))
+                modifier_dict.update(
+                    tp.calibrate_modifier_dict(dict(pm_blocks_dict[pm][BUILDING_MODIFIERS_STR][LEVEL_SCALED_STR])))
             modifier_dict = tp.parse_modifier_dict(dict(modifier_dict))
             for modifier, modifier_info in modifier_dict.items():
                 if modifier_info["am_type"] != "add":  # 暂时只允许add类modifier
@@ -184,13 +188,17 @@ class BuildingInfoTree:
 
         return localization_dict_used
 
+    def __get_automation_pm_list(self):
+        return [pm for pmg, pm_list in self.pmgs_info.items() if self.localization_info[pmg] == "自动化" for pm in
+                pm_list]
+
     # ------------------------------------------------------------------------------------------
     # ! 按建筑-生产方式群-生产方式创建信息树
-    def generate_tree(self):
+    def generate_tree(self) -> list:
         tree_list = self.parse_buildings()
         return tree_list
 
-    def parse_buildings(self):
+    def parse_buildings(self) -> list:
         buildings_list = []
         for building, building_info in self.buildings_info.items():
             buildings_list.append(BuildingNode(
@@ -202,7 +210,7 @@ class BuildingInfoTree:
 
         return buildings_list
 
-    def parse_pmgs(self, pmgs: list):
+    def parse_pmgs(self, pmgs: list) -> list:
         pmgs_list = []
         for pmg in pmgs:
             if pmg in self.pmgs_info:
@@ -216,7 +224,7 @@ class BuildingInfoTree:
 
         return pmgs_list
 
-    def parse_pms(self, pms):
+    def parse_pms(self, pms) -> list:
         pms_list = []
         for pm in pms:
             if pm in self.pms_info:

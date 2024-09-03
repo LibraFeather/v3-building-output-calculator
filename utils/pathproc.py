@@ -10,13 +10,12 @@ from config.path import MOD_PATH, VANILLA_PATH
 
 REPLACE_PATH_STR = "replace_paths"
 GAME_CUSTOM_DATA_STR = "game_custom_data"
+
 METADATA_PATH = ".metadata\\metadata.json"
 
 replace_paths_list = []
 
 
-# ------------------------------------------------------------------------------------------
-# 以下代码用于更新replace_paths_list
 def update_replace_paths_list():
     global replace_paths_list  # 这里需要对其赋值，因此必须使用global
     metadata_path = os.path.join(MOD_PATH, METADATA_PATH)

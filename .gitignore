@@ -8,3 +8,5 @@ __pycache__/
 
 # 忽略文件
 test.py
+trash.txt
+input_test.txt
