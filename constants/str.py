@@ -5,15 +5,21 @@
 # ------------------------------------------------------------------------------------------
 
 # 字符串
-COST_STR = "cost"
-WAGE_WEIGHT_STR = "wage_weight"
-REQUIRED_CONSTRUCTION_STR = "required_construction"
-PRODUCTION_METHOD_GROUPS_STR = "production_method_groups"
-PRODUCTION_METHODS_STR = "production_methods"
-BUILDING_MODIFIERS_STR = "building_modifiers"
-WORKFORCE_SCALED_STR = "workforce_scaled"
-LEVEL_SCALED_STR = "level_scaled"
-UNSCALED_SRT = "unscaled"
+COST = "cost"
+WAGE_WEIGHT = "wage_weight"
+REQUIRED_CONSTRUCTION = "required_construction"
+PRODUCTION_METHOD_GROUPS = "production_method_groups"
+PRODUCTION_METHODS = "production_methods"
+BUILDING_MODIFIERS = "building_modifiers"
+WORKFORCE_SCALED = "workforce_scaled"
+LEVEL_SCALED = "level_scaled"
+UNSCALED = "unscaled"
+ERA = "era"
+
+UNLOCKING_TECHNOLOGIES = "unlocking_technologies"
+UNLOCKING_PRODUCTION_METHODS = "unlocking_production_methods"
+UNLOCKING_PRINCIPLES = "unlocking_principles"
+UNLOCKING_LAWS = "unlocking_laws"
 
 # 字符串列表
 IO_LIST = ["input", "output"]

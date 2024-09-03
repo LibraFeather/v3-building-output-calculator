@@ -85,8 +85,10 @@ def extract_all_blocks(pattern: str, text: str, char: str) -> dict:
         name = NAME_PATTERN.search(name).group(0) if NAME_PATTERN.search(name) else "None"
         if block:
             if name in dict_block.keys():
-                print(f"{name}重复出现")
-            dict_block[name] = block
+                pass
+                # print(f"{name}重复出现")
+            else:
+                dict_block[name] = block
     return dict_block
 
 
@@ -347,5 +349,12 @@ def calibrate_modifier_dict(modifier_dict: dict) -> dict:
             modifier_dict[modifier] = float(sum(value))
     return modifier_dict
 
+
 # ------------------------------------------------------------------------------------------
-# 以下函数待清理
+def get_era_num(tech: str, era: str) -> int:
+    num_match = re.search(r"\d+", era)
+    if num_match:
+        return int(num_match.group())
+    else:
+        print(f"无法解析{tech}的{era}，因此假定为0")
+        return 0

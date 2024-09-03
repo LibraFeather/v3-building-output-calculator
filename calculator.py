@@ -23,7 +23,10 @@ class Calculator:
             'per_capita_profit': '人均利润',
             'per_cc_profit': '利润/建造力',
             'rate_of_return': '回报率',
-            'wage_weight': '工资倍率'
+            'wage_weight': '工资倍率',
+            "era": "时代要求",
+            "highest_tech": "最高科技要求",
+            "techs_all": "全部科技要求"
         }
         self.automation_pm_list = building_info_tree_complex.automation_pm_list
 
@@ -34,9 +37,19 @@ class Calculator:
         combinations = itertools.product(*(node.children for node in building.children))
 
         for combination in combinations:
-            one_line_data = self.__generate_one_line_data(combination, pmgs_list)
-            one_line_data_finished = self.__calculate_data(one_line_data, building)
-            one_line_data_list.append(one_line_data_finished)
+            pms_list = []
+            can_generate_data = True
+            for pm in combination:
+                pms_list.append(pm.localization_key)
+            for pm in combination:
+                if pm.unlocking_production_methods:
+                    if not list(set(pm.unlocking_production_methods) & set(pms_list)):
+                        can_generate_data = False
+                        break
+            if can_generate_data:
+                one_line_data = self.__generate_one_line_data(combination, pmgs_list)
+                one_line_data_finished = self.__calculate_data(one_line_data, building)
+                one_line_data_list.append(one_line_data_finished)
         return one_line_data_list
 
     @staticmethod
@@ -62,9 +75,12 @@ class Calculator:
         one_line_data = {
             "raw_data": {'goods_input': {}, 'goods_output': {}, 'workforce': {}},
             "pm_data": {},
-            "processed_data": {}
+            "processed_data": {},
+            "other_data": {"era": 0, "highest_tech": "", "techs_all": ""}
         }
 
+        highest_tech = []
+        techs_all = []
         for i in range(len(pmgs_list)):
             goods_input_add.update(combination[i].goods_add["input"])
             goods_output_add.update(combination[i].goods_add["output"])
@@ -72,10 +88,21 @@ class Calculator:
             goods_output_mult.update(combination[i].goods_mult["output"])
             workforce.update(combination[i].workforce)
             one_line_data["pm_data"][pmgs_list[i]] = combination[i].localization_value
+            for tech in combination[i].unlocking_technologies:
+                if tech.era > one_line_data["other_data"]["era"]:
+                    one_line_data["other_data"]["era"] = tech.era
+                    highest_tech = [tech]
+                if tech.era == one_line_data["other_data"]["era"] and tech not in highest_tech:
+                    highest_tech.append(tech)
+                if tech not in techs_all:
+                    techs_all.append(tech)
 
         one_line_data["raw_data"]['goods_input'] = calculate_good(dict(goods_input_add), dict(goods_input_mult))
         one_line_data["raw_data"]['goods_output'] = calculate_good(dict(goods_output_add), dict(goods_output_mult))
         one_line_data["raw_data"]['workforce'] = check_workforce_positive(dict(workforce))  # 将负值变为0
+
+        one_line_data["other_data"]["highest_tech"] = " ".join([tech.localization_value for tech in highest_tech])
+        one_line_data["other_data"]["techs_all"] = " ".join([tech.localization_value for tech in techs_all])
         return one_line_data
 
     def __calculate_data(self, one_line_data: dict, building) -> dict:
@@ -116,14 +143,15 @@ class Calculator:
         return [(building, self.__generate_one_line_data_list_for_single_building(building)) for building in
                 self.building_info_tree]
 
-    def __transfer_dict_to_df(self, building_info_list, building):
+    def __transfer_dict_to_df(self, one_line_data_list, building):
         pmg_list = building.children
         column_pmg = {pmg.localization_key: pmg.localization_value for pmg in pmg_list}
         colum_rename = column_pmg | self.COLUMN_HEADERS
         rows = []
-        for building_info in building_info_list:
-            rows.append(building_info["pm_data"] | building_info["processed_data"])
-        building_info_df = pd.DataFrame(building_info_list)
+        for one_line_data in one_line_data_list:
+            row = one_line_data["pm_data"] | one_line_data["processed_data"] | one_line_data["other_data"]
+            rows.append(row)
+        building_info_df = pd.DataFrame(rows)
         building_info_df.rename(columns=colum_rename, inplace=True)
         building_info_df.to_excel(
             f'{OUTPUT_PATH}\\buildings\\{building.localization_value}_{building.localization_key}.xlsx', index=False)
@@ -154,7 +182,8 @@ class Calculator:
                         pm_list.remove(automation_pm)
                         pm_list.insert(2, automation_pm)
                 pm_data = {column_4pm[i]: pm_list[i] for i in range(len(column_4pm))}
-                row = {"建筑": building.localization_value} | pm_data | one_line_data["processed_data"]
+                row = {"建筑": building.localization_value} | pm_data | one_line_data["processed_data"] | one_line_data[
+                    "other_data"]
                 rows.append(row)
         summary_table_df = pd.DataFrame(rows)
         summary_table_df.rename(columns=self.COLUMN_HEADERS, inplace=True)

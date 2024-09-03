@@ -48,3 +48,4 @@ Calista C.Manstainne，Recognized User L，15/08/2024
       2. `building_employment_<pop_type>_add`
    2. `unscaled`中的
       1. `goods_input/output_<good>_add/mult`
+5. 程序会将`technology`的`era`转化为`int`变量，读取方式是读取`era`变量的最后一个字符。
