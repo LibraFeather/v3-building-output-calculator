@@ -13,4 +13,4 @@
 - [ ] utils.textproc.parse_building_modifier支持所有类型的building modifier
 
 ## 代码优化
-- [ ] utils.textproc.parse_text_block过于复杂，需要重构
+- [x] utils.textproc.parse_text_block过于复杂，需要重构

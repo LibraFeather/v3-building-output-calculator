@@ -15,7 +15,7 @@ BUILDING_EMPLOYMENT_MODIFIER_PATTERN = re.compile(
     r"\bbuilding_employment_(?P<key_word>[\w\-]+?)_(?P<am_type>add|mult)\b")
 
 # 其他变量
-list_logic_keys = ["if", "else_if", "else", "add", "multiply", "divide"]
+LIST_LOGIC_KEYS = ["if", "else_if", "else", "add", "multiply", "divide"]
 
 
 def txt_combiner(path: str) -> str:
@@ -92,22 +92,21 @@ def extract_all_blocks(pattern: str, text: str, char: str) -> dict:
 
 # ------------------------------------------------------------------------------------------
 # 以下函数用于通过递归方法获得递归字典
-def find_first_operator(s: str, start=0):
+def find_first_operator(text: str, start=0):
     """
     寻找operator的位置
-    :param s: 待查询字符串
+    :param text: 待查询字符串
     :param start: 起始位置
     :return: 返回operator，开始位置和结束位置
     """
     # 搜索第一个匹配项
-    match = OPERATOR_PATTERN.search(s[start:])
-    if match:
-        operator = match.group()
-        start_pos = match.start() + start  # 相对位置，所以要加上start
-        end_pos = match.end() + start
-        return operator, start_pos, end_pos
-    else:
+    match = OPERATOR_PATTERN.search(text[start:])
+    if not match:
         return None, -1, -1
+    operator = match.group()
+    start_pos = match.start() + start  # 相对位置，所以要加上start
+    end_pos = match.end() + start
+    return operator, start_pos, end_pos
 
 
 def convert_to_number(value: str):
@@ -117,8 +116,7 @@ def convert_to_number(value: str):
     try:
         if '.' in value:
             return float(value)
-        else:
-            return int(value)
+        return int(value)
     except ValueError:
         return value
 
@@ -131,7 +129,7 @@ def parse_text_block(start: int, text: str) -> tuple:
     :return: block名称、内容和新的起始位置
     """
 
-    def find_bracket_content(_start: int) -> tuple:
+    def parse_bracket_content(_start: int) -> tuple:
         """
         查找并返回从指定位置开始的花括号内的内容
         :param _start: 开始位置
@@ -148,7 +146,7 @@ def parse_text_block(start: int, text: str) -> tuple:
         print(f"文件出现花括号不匹配")
         return text[_start + 1:], len_text + 1  # 如果花括号不匹配，输出后面全部的文件
 
-    def find_quotation_mark(_start: int) -> tuple:
+    def parse_quotation_mark_content(_start: int) -> tuple:
         for k in range(_start + 1, len_text):  # 跳过第一个引号，只需要知道第二个引号的位置
             if text[k] == "\"":
                 return text[_start:k + 1], k + 1  # 包括两端的引号
@@ -158,92 +156,66 @@ def parse_text_block(start: int, text: str) -> tuple:
 
     operator, operator_start, operator_end = find_first_operator(text, start)
     len_text = len(text)
-    name = ""
-    content = ""
-    new_start = None
-    if operator is not None:
-        name = text[start:operator_start].strip() + (f".[{operator}]" if operator != "=" else "")  # 记录符号，除非是等号
-        for i in range(operator_end, len_text):
-            if text[i] == "\n":
-                new_start = i + 1
-                break
-            if text[i] not in (" ", "\t"):  # 找到第一个非空白字符的位置
-                if text[i] == "{":
-                    content, new_start = find_bracket_content(i)
-                    break
-                if text[i] == "\"":
-                    content, new_start = find_quotation_mark(i)
-                    break
-                # 以上两个if不满足时才会执行
-                for j in range(i, len_text):
-                    if text[j].isspace() or text[j] == "{":
-                        content = text[i:j]
-                        if text[j] == "\n":
-                            new_start = j + 1
-                            break
-                        if text[j] == "{":
-                            name += f".[{content}]"  # 这一段是用来处理颜色的
-                            content, new_start = find_bracket_content(j)
-                            break
-                        else:  # 这里text[j]是\t或者空格
-                            for m in range(j + 1, len_text):
-                                if text[m] == "\n":
-                                    new_start = m + 1
-                                    break
-                                if text[m] == "{":
-                                    name += f".[{content}]"  # 这一段是用来处理颜色的
-                                    content, new_start = find_bracket_content(m)
-                                    break
-                                if text[m] not in (" ", "\t"):
-                                    new_start = m
-                                    break
-                        break
-                    if new_start is not None:
-                        break
-            if new_start is not None:
-                break
-
-        if new_start is None:
-            content = text[operator_end:].strip()
-            new_start = len_text + 1
-    else:
-        new_start = len_text + 1
-    return name, content, new_start
+    if operator is None:
+        return "", "", len_text + 1
+    name = text[start:operator_start].strip() + (f".[{operator}]" if operator != "=" else "")  # 记录符号，除非是等号
+    first_non_space = re.search(r"\S+", text[operator_end:len_text])
+    if first_non_space is None:
+        return name, "", len_text + 1
+    first_non_space_start = operator_end + first_non_space.start()
+    first_non_space_end = operator_end + first_non_space.end()
+    bracket = re.search(r"\{", first_non_space.group())
+    if first_non_space.group()[0] == "@":
+        content = re.search(".*", text[first_non_space_start:len_text])
+        return name, content.group(), first_non_space_start + content.end()
+    if bracket:
+        bracket_start = first_non_space_start + bracket.start()
+        name += f".[{text[first_non_space_start:bracket_start]}]" if text[first_non_space_start:bracket_start] else ""
+        return name, *parse_bracket_content(bracket_start)
+    if first_non_space.group()[0] == "\"":
+        return name, *parse_quotation_mark_content(first_non_space_start)
+    second_non_space = re.search(r"\S+", text[first_non_space_end:len_text])
+    if second_non_space is None:
+        return name, first_non_space.group(), len_text + 1
+    second_non_space_start = first_non_space_end + second_non_space.start()
+    if second_non_space.group()[0] == "{":
+        name += f".[{first_non_space.group()}]"
+        return name, *parse_bracket_content(second_non_space_start)
+    return name, first_non_space.group(), second_non_space_start
 
 
-def divide_text_into_dict(text, override=True) -> dict:
-    """
-    将文本分割成不同的部分，并存储在字典中
-    :param override: 重复的value是否覆盖
-    :param text: 待分割文本
-    :return: block名称和内容的字典
-    """
+def convert_text_into_dict(text: str, blocks_dict=None, logic_keys_dict=None, override=True):
+    if blocks_dict is None:
+        blocks_dict = {}
+    if logic_keys_dict is None:
+        logic_keys_dict = {logic_key: -1 for logic_key in LIST_LOGIC_KEYS}
     text = re.sub(r"#.*$", "", text, flags=re.MULTILINE)
     start = 0
-    dict_blocks = {}
-    dict_logic_key = {logic_key: -1 for logic_key in list_logic_keys}
-    while start < len(text):  # parse_text_block会返回下一个block的开始位置，如果开始位置比文件长度还长，那么终止循环
+    while start < len(text):
         key, value, start = parse_text_block(start, text)
+        if not key:
+            continue
         value = convert_to_number(value)
-        if key in list_logic_keys:
-            dict_logic_key[key] += 1
-            key = f"{key}.[{dict_logic_key[key]}]"
-        if key:  # 防止异常值进入字典，这里认为value可以为空
-            if key in dict_blocks:
-                if override:
-                    print(f"{key}重复出现，新值将会覆盖旧值")
-                    dict_blocks[key] = value
-                else:  # 把新值加在旧值后面
-                    if isinstance(dict_blocks[key], list):
-                        dict_blocks[key].append(value)
-                    else:
-                        dict_blocks[key] = [dict_blocks[key], value]
-            else:
-                dict_blocks[key] = value
-    return dict_blocks
+        if key in LIST_LOGIC_KEYS:
+            logic_keys_dict[key] += 1
+            key = f"{key}.[{logic_keys_dict[key]}]"
+            blocks_dict[key] = value
+            continue
+        if key not in blocks_dict:
+            blocks_dict[key] = value
+            continue
+        if override:
+            print(f"{key}重复出现，新值将会覆盖旧值")
+            blocks_dict[key] = value
+            continue
+        if isinstance(blocks_dict[key], list):
+            blocks_dict[key].append(value)
+            continue
+        blocks_dict[key] = [blocks_dict[key], value]
+    return blocks_dict
 
 
-def divide_text_into_dict_from_path(path: str, override=True) -> dict:
+def convert_text_into_dict_from_path(path: str, override=True) -> dict:
     """
     将文本分割成不同的部分，并存储在字典中
     :param path: 待处理的路径
@@ -251,39 +223,20 @@ def divide_text_into_dict_from_path(path: str, override=True) -> dict:
     :return: block名称和内容的字典
     """
     list_file_paths = pp.get_file_paths_list(path)  # 获取所有的路径
-    dict_blocks = {}
+    blocks_dict = {}
+    logic_keys_dict = {logic_key: -1 for logic_key in LIST_LOGIC_KEYS}
     for file_path in list_file_paths:  # 对文件分别进行处理，以防止格式错误造成污染
         if not file_path.endswith(".info"):  # 忽略info文件，这个文件的作用类似注释
-            with open(file_path, "r", encoding="utf-8-sig") as f:
-                content = f.read()
-            content = re.sub(r"#.*$", "", content, flags=re.MULTILINE)
-            start = 0
-            dict_logic_key = {logic_key: -1 for logic_key in list_logic_keys}  # 这些键不应该被合并，通过这种方式来区分
-            while start < len(content):  # parse_text_block会返回下一个block的开始位置，如果开始位置比文件长度还长，那么终止循环
-                key, value, start = parse_text_block(start, content)
-                value = convert_to_number(value)
-                if key in list_logic_keys:
-                    dict_logic_key[key] += 1
-                    key = f"{key}.[{dict_logic_key[key]}]"
-                if key:  # 防止异常值进入字典，这里认为value可以为空
-                    if key in dict_blocks:
-                        if override:
-                            print(f"{key}重复出现，新值将会覆盖旧值")
-                            dict_blocks[key] = value
-                        else:  # 把新值加在旧值后面
-                            if isinstance(dict_blocks[key], list):
-                                dict_blocks[key].append(value)
-                            else:
-                                dict_blocks[key] = [dict_blocks[key], value]
-                    else:
-                        dict_blocks[key] = value
-    return dict_blocks
+            with open(file_path, "r", encoding="utf-8-sig") as file:
+                text = file.read()
+            blocks_dict = convert_text_into_dict(text, blocks_dict, logic_keys_dict, override)
+    return blocks_dict
 
 
-def divide_dict_value(dict_block: dict) -> dict:
+def divide_dict_value(blocks_dict: dict) -> dict:
     """
     递归函数，进一步对dict的value进行解析
-    :param dict_block: 待解析的dict
+    :param blocks_dict: 待解析的dict
     :return: 递归解析后的dict
     """
 
@@ -291,19 +244,21 @@ def divide_dict_value(dict_block: dict) -> dict:
         """
         处理字符串内容，递归解析或分割为列表
         """
+        if content[0] in ["\"", "@"]:
+            return content
         if any(op in content for op in ("<", "=", ">")):  # 这里通过这三个符号判断是否能够进一步解析
-            return divide_dict_value(divide_text_into_dict(content, False))
+            return get_nested_dict_from_text(content, override=False)
         match_whitespace = re.search(r"\s", content)
-        if match_whitespace:  # 不可解析时，如果内容被空白分割，那么将其转化为列表
-            return [convert_to_number(item) for item in NAME_PATTERN.findall(content)]
-        return content
+        if match_whitespace is None:
+            return content
+        return [convert_to_number(item) for item in re.findall(r"\S+", content)]
 
-    for key, value in dict_block.items():
+    for key, value in blocks_dict.items():
         if isinstance(value, str):
-            dict_block[key] = process_content(value)
+            blocks_dict[key] = process_content(value)
         elif isinstance(value, list):
-            dict_block[key] = [process_content(item) if isinstance(item, str) else item for item in value]
-    return dict_block
+            blocks_dict[key] = [process_content(item) if isinstance(item, str) else item for item in value]
+    return blocks_dict
 
 
 def get_nested_dict_from_path(path: str, override=True) -> dict:
@@ -313,13 +268,13 @@ def get_nested_dict_from_path(path: str, override=True) -> dict:
     :param override: 新值是否覆盖旧值
     :return: 嵌套字典
     """
-    nested_dict = divide_text_into_dict_from_path(path, override)
+    nested_dict = convert_text_into_dict_from_path(path, override)
     nested_dict = divide_dict_value(nested_dict)
     return nested_dict
 
 
 def get_nested_dict_from_text(text: str, override=True) -> dict:
-    nested_dict = divide_text_into_dict(text, override)
+    nested_dict = convert_text_into_dict(text, override=override)
     nested_dict = divide_dict_value(nested_dict)
     return nested_dict
 
@@ -389,7 +344,6 @@ def calibrate_modifier_dict(modifier_dict: dict) -> dict:
         if isinstance(value, list):
             modifier_dict[modifier] = float(sum(value))
     return modifier_dict
-
 
 # ------------------------------------------------------------------------------------------
 # 以下函数待清理

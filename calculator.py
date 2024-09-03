@@ -28,7 +28,6 @@ class Calculator:
         self.automation_pm_list = building_info_tree_complex.automation_pm_list
 
     # ------------------------------------------------------------------------------------------
-    # __generate_one_line_data_list_for_single_building部分
     def __generate_one_line_data_list_for_single_building(self, building) -> list:
         one_line_data_list = []
         pmgs_list = [pmg.localization_key for pmg in building.children]  # 这里使用localization_key防止重复
