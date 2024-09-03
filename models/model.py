@@ -18,6 +18,6 @@ class BuildingNode(NormalNode):
 # 生产方式应用此类节点
 @dataclass
 class PMNode(NormalNode):
-    good_input: dict
-    good_output: dict
+    goods_add: dict
+    goods_mult: dict
     workforce: dict

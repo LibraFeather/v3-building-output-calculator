@@ -321,6 +321,8 @@ def parse_modifier(modifier: str):
             return parse_good_modifier(modifier)
         case "building":
             return parse_building_modifier(modifier)
+        case "unit":  # 为了防止报错
+            return None
         case _:
             return wrong_format(modifier)
 

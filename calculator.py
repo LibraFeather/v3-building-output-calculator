@@ -47,23 +47,34 @@ class Calculator:
                     workforce_dict[_] = 0
             return workforce_dict
 
-        good_input = Counter()  # pycharm会记住嵌套字典的变量类型，所以这里把Counter单独拿出来处理
-        good_output = Counter()
+        def calculate_good(goods_add, goods_mult):
+            for good in goods_add:
+                if good in goods_mult:
+                    mult = 1 + goods_mult[good]
+                    goods_add[good] = goods_add[good] * mult if mult > 0 else 0
+            return goods_add
+
+        goods_input_add = Counter()  # pycharm会记住嵌套字典的变量类型，所以这里把Counter单独拿出来处理
+        goods_output_add = Counter()
+        goods_input_mult = Counter()
+        goods_output_mult = Counter()
         workforce = Counter()
         one_line_data = {
-            "raw_data": {'good_input': {}, 'good_output': {}, 'workforce': {}},
+            "raw_data": {'goods_input': {}, 'goods_output': {}, 'workforce': {}},
             "pm_data": {},
             "processed_data": {}
         }
 
         for i in range(len(pmgs_list)):
-            good_input.update(combination[i].good_input)
-            good_output.update(combination[i].good_output)
+            goods_input_add.update(combination[i].goods_add["input"])
+            goods_output_add.update(combination[i].goods_add["output"])
+            goods_input_mult.update(combination[i].goods_mult["input"])
+            goods_output_mult.update(combination[i].goods_mult["output"])
             workforce.update(combination[i].workforce)
             one_line_data["pm_data"][pmgs_list[i]] = combination[i].localization_value
 
-        one_line_data["raw_data"]['good_input'] = dict(good_input)
-        one_line_data["raw_data"]['good_output'] = dict(good_output)
+        one_line_data["raw_data"]['goods_input'] = calculate_good(dict(goods_input_add), dict(goods_input_mult))
+        one_line_data["raw_data"]['goods_output'] = calculate_good(dict(goods_output_add), dict(goods_output_mult))
         one_line_data["raw_data"]['workforce'] = check_workforce_positive(dict(workforce))  # 将负值变为0
         return one_line_data
 
@@ -76,10 +87,10 @@ class Calculator:
         回报率 = 商品产出总产值/商品投入总产值
         工资倍率 = 劳动力工资权重的加权平均
         """
-        input_cost = sum(one_line_data["raw_data"]['good_input'][item] * self.goods_info[item]
-                         for item in one_line_data["raw_data"]['good_input'])
-        output_cost = sum(one_line_data["raw_data"]['good_output'][item] * self.goods_info[item]
-                          for item in one_line_data["raw_data"]['good_output'])
+        input_cost = sum(one_line_data["raw_data"]['goods_input'][good] * self.goods_info[good]
+                         for good in one_line_data["raw_data"]['goods_input'])
+        output_cost = sum(one_line_data["raw_data"]['goods_output'][good] * self.goods_info[good]
+                          for good in one_line_data["raw_data"]['goods_output'])
         workforce_population = sum(one_line_data["raw_data"]['workforce'].values())
         profit = output_cost - input_cost
         per_capita_profit = profit / workforce_population * 52 if workforce_population else 'Null'
@@ -150,8 +161,11 @@ class Calculator:
         summary_table_df.to_excel(f"{OUTPUT_PATH}\\buildings\\00_总表.xlsx", index=False)
         print("总表.xlsx 输出成功")
 
+    def output(self):
+        self.output_every_building()
+        self.output_all_buildings()
+
 
 if __name__ == '__main__':
     calculator = Calculator()
-    calculator.output_every_building()
-    calculator.output_all_buildings()
+    calculator.output()

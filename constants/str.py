@@ -13,6 +13,7 @@ PRODUCTION_METHODS_STR = "production_methods"
 BUILDING_MODIFIERS_STR = "building_modifiers"
 WORKFORCE_SCALED_STR = "workforce_scaled"
 LEVEL_SCALED_STR = "level_scaled"
+UNSCALED_SRT = "unscaled"
 
 # 字符串列表
 IO_LIST = ["input", "output"]

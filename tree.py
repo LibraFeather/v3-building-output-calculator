@@ -1,11 +1,3 @@
-"""
-Calista C.Manstainne 于2024.8.24开始重构
-整体思路：
-1. 用正则表达式处理p语言字段的同时，做出存储各类数据的容器
-2. 按照建筑-生产方式群-生产方式结构生成一棵树，数据来源之前的容器
-3. 根据这棵树，处理各项数据，做成表格导出（计划新开一个文件来处理）
-"""
-
 import re
 from collections import Counter
 
@@ -15,7 +7,7 @@ import utils.textproc as tp
 from constants.path import GOODS_PATH, POP_TYPES_PATH, BUILDINGS_PATH, PMG_PATH, PM_PATH, LOCALIZATION_PATH, \
     SCRIPT_VALUE_PATH
 from constants.str import COST_STR, WAGE_WEIGHT_STR, REQUIRED_CONSTRUCTION_STR, PRODUCTION_METHOD_GROUPS_STR, \
-    PRODUCTION_METHODS_STR, BUILDING_MODIFIERS_STR, WORKFORCE_SCALED_STR, LEVEL_SCALED_STR
+    PRODUCTION_METHODS_STR, BUILDING_MODIFIERS_STR, WORKFORCE_SCALED_STR, LEVEL_SCALED_STR, UNSCALED_SRT
 from models.model import NormalNode, BuildingNode, PMNode
 
 LOCALIZATION_PATTERN = r"^\s+[\w\-.]+:.+"
@@ -24,7 +16,7 @@ LOCALIZATION_REPLACE_PATTERN = r"\$([\w\-.]+)\$"
 
 class BuildingInfoTree:
     def __init__(self) -> None:
-        self.scrit_value_info = self.__get_scrit_value_info()
+        self.scrit_value_info = tp.get_nested_dict_from_path(SCRIPT_VALUE_PATH)
         self.goods_info = self.__get_goods_info()
         self.pop_types_info = self.__get_pops_info()
         self.buildings_info = self.__get_buildings_info()
@@ -35,10 +27,6 @@ class BuildingInfoTree:
         self.automation_pm_list = self.__get_automation_pm_list()
 
         self.tree = self.generate_tree()
-
-    @staticmethod
-    def __get_scrit_value_info() -> dict:
-        return tp.get_nested_dict_from_path(SCRIPT_VALUE_PATH)
 
     # ! 预备部分，创建各项存储字典
     @staticmethod
@@ -127,11 +115,16 @@ class BuildingInfoTree:
         pm_blocks_dict = tp.get_nested_dict_from_path(PM_PATH)
         pms_dict = {}
         for pm in pm_blocks_dict:
-            pms_dict[pm] = {"input": {}, "output": {}, "workscale": {}}
+            pms_dict[pm] = {
+                "add": {"input": {}, "output": {}},
+                "mult": {"input": {}, "output": {}},
+                "employment": {}
+            }
             if BUILDING_MODIFIERS_STR not in pm_blocks_dict[pm]:
                 # print(f"{pm}中缺少{BUILDING_MODIFIERS_STR}")
                 continue
 
+            # TODO 这一段对modifier的处理需要重构
             modifier_dict = Counter()
             if WORKFORCE_SCALED_STR in pm_blocks_dict[pm][BUILDING_MODIFIERS_STR]:
                 modifier_dict.update(tp.calibrate_modifier_dict(
@@ -141,21 +134,42 @@ class BuildingInfoTree:
                     tp.calibrate_modifier_dict(dict(pm_blocks_dict[pm][BUILDING_MODIFIERS_STR][LEVEL_SCALED_STR])))
             modifier_dict = tp.parse_modifier_dict(dict(modifier_dict))
             for modifier, modifier_info in modifier_dict.items():
-                if modifier_info["am_type"] != "add":  # 暂时只允许add类modifier
-                    print(f"{pm}的{modifier}的{modifier_info["am_type"]}不是add，因此被忽略")
+                if modifier_info["am_type"] != "add":  # 只允许add类modifier
+                    print(f"{pm}的{WORKFORCE_SCALED_STR}或{LEVEL_SCALED_STR}的{modifier}不是add类，因此被忽略")
                     continue
                 match modifier_info["category"]:
                     case "goods":
                         if modifier_info["key_word"] not in self.goods_info:
                             print(f"未找到{pm}中{modifier_info["key_word"]}的定义")
                             continue
-                        pms_dict[pm][modifier_info["io_type"]][modifier_info["key_word"]] = modifier_info["value"]
+                        pms_dict[pm]["add"][modifier_info["io_type"]][modifier_info["key_word"]] = modifier_info["value"]
                     case "building_employment":
                         if modifier_info["key_word"] not in self.pop_types_info:
                             print(f"未找到{pm}中{modifier_info["key_word"]}的定义")
                             continue
-                        pms_dict[pm]["workscale"][modifier_info["key_word"]] = modifier_info["value"]
-
+                        pms_dict[pm]["employment"][modifier_info["key_word"]] = modifier_info["value"]
+            if UNSCALED_SRT in pm_blocks_dict[pm][BUILDING_MODIFIERS_STR]:
+                modifier_dict = tp.parse_modifier_dict(
+                    tp.calibrate_modifier_dict(dict(pm_blocks_dict[pm][BUILDING_MODIFIERS_STR][UNSCALED_SRT])))
+                for modifier, modifier_info in modifier_dict.items():
+                    match modifier_info["category"]:
+                        case "goods":
+                            if modifier_info["key_word"] not in self.goods_info:
+                                print(f"未找到{pm}中{modifier_info["key_word"]}的定义")
+                                continue
+                            match modifier_info["am_type"]:
+                                case "add":
+                                    if modifier_info["key_word"] in pms_dict[pm]["add"][modifier_info["io_type"]]:
+                                        pms_dict[pm]["add"][modifier_info["io_type"]][modifier_info["key_word"]]\
+                                            += modifier_info["value"]
+                                    else:
+                                        pms_dict[pm]["add"][modifier_info["io_type"]][modifier_info["key_word"]]\
+                                            = modifier_info["value"]
+                                case "mult":
+                                    pms_dict[pm]["mult"][modifier_info["io_type"]][modifier_info["key_word"]]\
+                                        = modifier_info["value"]
+                        case _:
+                            print(f"{pm}的{UNSCALED_SRT}的{modifier}无法被解析")
         return pms_dict
 
     def __get_localization_info(self) -> dict:
@@ -231,9 +245,9 @@ class BuildingInfoTree:
                 pms_list.append(PMNode(
                     localization_key=pm,
                     localization_value=self.localization_info[pm],
-                    good_input=self.pms_info[pm]['input'],
-                    good_output=self.pms_info[pm]['output'],
-                    workforce=self.pms_info[pm]['workscale'],
+                    goods_add=self.pms_info[pm]["add"],
+                    goods_mult=self.pms_info[pm]["mult"],
+                    workforce=self.pms_info[pm]['employment'],
                     children=[]
                 ))
             else:
