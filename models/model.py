@@ -26,6 +26,8 @@ class PMNode(Name):
     unlocking_production_methods: list
     unlocking_principles: list
     unlocking_laws: list
+    disallowing_laws: list
+    unlocking_identity: list
     goods_add: dict
     goods_mult: dict
     workforce: dict

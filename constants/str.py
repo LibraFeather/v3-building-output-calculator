@@ -20,6 +20,8 @@ UNLOCKING_TECHNOLOGIES = "unlocking_technologies"
 UNLOCKING_PRODUCTION_METHODS = "unlocking_production_methods"
 UNLOCKING_PRINCIPLES = "unlocking_principles"
 UNLOCKING_LAWS = "unlocking_laws"
+DISALLOWING_LAWS = "disallowing_laws"
+UNLOCKING_IDENTITY = "unlocking_identity"
 
 # 字符串列表
 IO_LIST = ["input", "output"]

@@ -7,7 +7,7 @@ import utils.path_to_dict as ptd
 # TODO 按照类型排列
 from constants.path import LOCALIZATION_PATH
 import constants.str as s
-from models.model import NormalNode, BuildingNode, PMNode, TechNode
+from models.model import NormalNode, BuildingNode, PMNode, TechNode, Name
 
 LOCALIZATION_PATTERN = r"^\s+[\w\-.]+:.+"
 LOCALIZATION_REPLACE_PATTERN = r"\$([\w\-.]+)\$"
@@ -18,7 +18,10 @@ class BuildingInfoTree:
         self.scrit_values_info = ptd.get_nested_dict("script_values")
         self.buildings_info = self.__get_buildings_info()
         self.goods_info = self.__get_goods_info()
+        self.laws_info = ptd.get_nested_dict("laws")
         self.pop_types_info = self.__get_pops_info()
+        self.identities_info = ptd.get_nested_dict("power_bloc_identities")
+        self.principles_info = ptd.get_nested_dict("power_bloc_principles")
         self.pmgs_info = self.__get_pmgs_info()
         self.pms_info = self.__get_pms_info()
         self.technologies_info = self.__get_technologies_info()
@@ -140,6 +143,9 @@ class BuildingInfoTree:
             pms_dict[pm][s.UNLOCKING_PRODUCTION_METHODS] = pm_blocks_dict[pm].get(s.UNLOCKING_PRODUCTION_METHODS, [])
             pms_dict[pm][s.UNLOCKING_PRINCIPLES] = pm_blocks_dict[pm].get(s.UNLOCKING_PRINCIPLES, [])
             pms_dict[pm][s.UNLOCKING_LAWS] = pm_blocks_dict[pm].get(s.UNLOCKING_LAWS, [])
+            pms_dict[pm][s.DISALLOWING_LAWS] = pm_blocks_dict[pm].get(s.DISALLOWING_LAWS, [])
+            identity = pm_blocks_dict[pm].get(s.UNLOCKING_IDENTITY)
+            pms_dict[pm][s.UNLOCKING_IDENTITY] = [identity] if identity is not None else []
 
             if s.BUILDING_MODIFIERS not in pm_blocks_dict[pm]:
                 # print(f"{pm}中缺少{BUILDING_MODIFIERS_STR}")
@@ -199,8 +205,23 @@ class BuildingInfoTree:
         localization_dict_all = tp.extract_all_blocks(LOCALIZATION_PATTERN, content, "\"")
 
         localization_keys_used = list(self.buildings_info.keys()) + list(self.pmgs_info.keys()) + list(
-            self.pms_info.keys()) + list(self.technologies_info.keys())
+            self.pms_info.keys()) + list(self.technologies_info.keys()) + list(self.identities_info) + list(
+            self.laws_info)
+        principle_keys = list(self.principles_info.keys())  # 原则特殊，需要单独处理
         localization_dict_used = {}
+
+        for principle_key in principle_keys:
+            principle_match = re.search(r"principle_(?P<name>[\w\-]+?)_(?P<value>\d+)", principle_key)
+            if principle_match is None:
+                localization_dict_used[principle_keys] = principle_key
+                continue
+            principle_group_key = "principle_group_" + principle_match.group("name")
+            if principle_group_key in localization_dict_all:
+                localization_dict_used[principle_key] = localization_dict_all[principle_group_key] + principle_match.group("value")
+            else:
+                print(f"找不到{principle_group_key}的本地化")
+                localization_dict_used[principle_key] = principle_key
+
         for key in localization_keys_used:
             if key in localization_dict_all:  # 一些键没有对应的值
                 localization_dict_used[key] = localization_dict_all[key]
@@ -269,8 +290,11 @@ class BuildingInfoTree:
                     localization_value=self.localization_info[pm],
                     unlocking_technologies=self.parse_tech(self.pms_info[pm][s.UNLOCKING_TECHNOLOGIES]),
                     unlocking_production_methods=self.pms_info[pm][s.UNLOCKING_PRODUCTION_METHODS],
-                    unlocking_principles=self.pms_info[pm][s.UNLOCKING_PRINCIPLES],
-                    unlocking_laws=self.pms_info[pm][s.UNLOCKING_LAWS],
+                    unlocking_principles=self.parse_name(self.pms_info[pm][s.UNLOCKING_PRINCIPLES],
+                                                         self.principles_info),
+                    unlocking_laws=self.parse_name(self.pms_info[pm][s.UNLOCKING_LAWS], self.laws_info),
+                    disallowing_laws=self.parse_name(self.pms_info[pm][s.DISALLOWING_LAWS], self.laws_info),
+                    unlocking_identity=self.parse_name(self.pms_info[pm][s.UNLOCKING_IDENTITY], self.identities_info),
                     goods_add=self.pms_info[pm]["add"],
                     goods_mult=self.pms_info[pm]["mult"],
                     workforce=self.pms_info[pm]['employment'],
@@ -291,3 +315,15 @@ class BuildingInfoTree:
             else:
                 print(f"{tech}无定义")
         return techs_list
+
+    def parse_name(self, objects: list, info: dict) -> list:
+        objects_list = []
+        for _object in objects:
+            if _object in info:
+                objects_list.append(Name(
+                    localization_key=_object,
+                    localization_value=self.localization_info[_object]
+                ))
+            else:
+                print(f"{_object}无定义")
+        return objects_list

@@ -37,7 +37,8 @@ def get_file_paths_list(folder_path: str):
     def update_paths_dict(path):
         for root, _, files in os.walk(path):
             for file in files:
-                file_paths[file] = os.path.join(root, file)
+                relative_path = os.path.relpath(str(os.path.join(root, file)), path)  # 使用相对路径，防止因为文件名重复而覆盖
+                file_paths[relative_path] = os.path.join(root, file)
 
     file_paths = {}
     input_folder_path = os.path.join(MOD_PATH, folder_path)

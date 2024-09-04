@@ -26,7 +26,11 @@ class Calculator:
             'wage_weight': '工资倍率',
             "era": "时代要求",
             "highest_tech": "最高科技要求",
-            "techs_all": "全部科技要求"
+            "techs_all": "全部科技要求",
+            "unlocking_laws": "法律要求",
+            "disallowing_laws": "法律限制",
+            "unlocking_identity": "核心理念支柱要求",
+            "unlocking_principles": "原则要求"
         }
         self.automation_pm_list = building_info_tree_complex.automation_pm_list
 
@@ -67,6 +71,11 @@ class Calculator:
                     goods_add[good] = goods_add[good] * mult if mult > 0 else 0
             return goods_add
 
+        def add_object_to_list(objects_list: list, new_list: list) -> None:
+            for _object in objects_list:
+                if _object not in new_list:
+                    new_list.append(_object)
+
         goods_input_add = Counter()  # pycharm会记住嵌套字典的变量类型，所以这里把Counter单独拿出来处理
         goods_output_add = Counter()
         goods_input_mult = Counter()
@@ -76,11 +85,17 @@ class Calculator:
             "raw_data": {'goods_input': {}, 'goods_output': {}, 'workforce': {}},
             "pm_data": {},
             "processed_data": {},
-            "other_data": {"era": 0, "highest_tech": "", "techs_all": ""}
+            "other_data": {"era": 0, "highest_tech": "", "techs_all": "", "unlocking_principles": "",
+                           "unlocking_identity": "", "unlocking_laws": "", "disallowing_laws": ""}
         }
 
+        # TODO 这里需要进一步简化代码
         highest_tech = []
         techs_all = []
+        unlocking_principles = []
+        unlocking_identity = []
+        unlocking_laws = []
+        disallowing_laws = []
         for i in range(len(pmgs_list)):
             goods_input_add.update(combination[i].goods_add["input"])
             goods_output_add.update(combination[i].goods_add["output"])
@@ -96,6 +111,10 @@ class Calculator:
                     highest_tech.append(tech)
                 if tech not in techs_all:
                     techs_all.append(tech)
+            add_object_to_list(combination[i].unlocking_principles, unlocking_principles)
+            add_object_to_list(combination[i].unlocking_identity, unlocking_identity)
+            add_object_to_list(combination[i].unlocking_laws, unlocking_laws)
+            add_object_to_list(combination[i].disallowing_laws, disallowing_laws)
 
         one_line_data["raw_data"]['goods_input'] = calculate_good(dict(goods_input_add), dict(goods_input_mult))
         one_line_data["raw_data"]['goods_output'] = calculate_good(dict(goods_output_add), dict(goods_output_mult))
@@ -103,6 +122,10 @@ class Calculator:
 
         one_line_data["other_data"]["highest_tech"] = " ".join([tech.localization_value for tech in highest_tech])
         one_line_data["other_data"]["techs_all"] = " ".join([tech.localization_value for tech in techs_all])
+        one_line_data["other_data"]["unlocking_principles"] = " ".join([principle.localization_value for principle in unlocking_principles])
+        one_line_data["other_data"]["unlocking_identity"] = " ".join([identity.localization_value for identity in unlocking_identity])
+        one_line_data["other_data"]["unlocking_laws"] = " ".join([law.localization_value for law in unlocking_laws])
+        one_line_data["other_data"]["disallowing_laws"] = " ".join([law.localization_value for law in disallowing_laws])
         return one_line_data
 
     def __calculate_data(self, one_line_data: dict, building) -> dict:
