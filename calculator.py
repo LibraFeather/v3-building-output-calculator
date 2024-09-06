@@ -82,7 +82,7 @@ class Calculator:
         goods_output_mult = Counter()
         workforce = Counter()
         one_line_data = {
-            "raw_data": {'goods_input': {}, 'goods_output': {}, 'workforce': {}},
+            "raw_data": {'goods_input': {}, 'goods_output': {}, 'workforce': {}, "subsistence_output": 0},
             "pm_data": {},
             "processed_data": {},
             "other_data": {"era": 0, "highest_tech": "", "techs_all": "", "unlocking_principles": "",
@@ -102,6 +102,7 @@ class Calculator:
             goods_input_mult.update(combination[i].goods_mult["input"])
             goods_output_mult.update(combination[i].goods_mult["output"])
             workforce.update(combination[i].workforce)
+            one_line_data["raw_data"]["subsistence_output"] += combination[i].subsistence_output
             one_line_data["pm_data"][pmgs_list[i]] = combination[i].localization_value
             for tech in combination[i].unlocking_technologies:
                 if tech.era > one_line_data["other_data"]["era"]:
@@ -122,8 +123,10 @@ class Calculator:
 
         one_line_data["other_data"]["highest_tech"] = " ".join([tech.localization_value for tech in highest_tech])
         one_line_data["other_data"]["techs_all"] = " ".join([tech.localization_value for tech in techs_all])
-        one_line_data["other_data"]["unlocking_principles"] = " ".join([principle.localization_value for principle in unlocking_principles])
-        one_line_data["other_data"]["unlocking_identity"] = " ".join([identity.localization_value for identity in unlocking_identity])
+        one_line_data["other_data"]["unlocking_principles"] = " ".join(
+            [principle.localization_value for principle in unlocking_principles])
+        one_line_data["other_data"]["unlocking_identity"] = " ".join(
+            [identity.localization_value for identity in unlocking_identity])
         one_line_data["other_data"]["unlocking_laws"] = " ".join([law.localization_value for law in unlocking_laws])
         one_line_data["other_data"]["disallowing_laws"] = " ".join([law.localization_value for law in disallowing_laws])
         return one_line_data
@@ -142,13 +145,16 @@ class Calculator:
         output_cost = sum(one_line_data["raw_data"]['goods_output'][good] * self.goods_info[good]
                           for good in one_line_data["raw_data"]['goods_output'])
         workforce_population = sum(one_line_data["raw_data"]['workforce'].values())
-        profit = output_cost - input_cost
+        profit = output_cost - input_cost + sum(
+            one_line_data["raw_data"]["subsistence_output"] * one_line_data["raw_data"]['workforce'][pop_type] *
+            self.pop_type_info[pop_type].subsistence_income for pop_type in one_line_data["raw_data"]['workforce']) / 52
         per_capita_profit = profit / workforce_population * 52 if workforce_population else 'Null'
         per_cc_profit = profit / building.building_cost if building.building_cost else 'Null'
         rate_of_return = output_cost / input_cost if input_cost > 0 else 'Null'
-        wage_weight = sum(one_line_data["raw_data"]['workforce'][item] * self.pop_type_info[item] for item in
-                          one_line_data["raw_data"][
-                              'workforce']) / workforce_population if workforce_population else 'Null'
+        wage_weight = sum(
+            one_line_data["raw_data"]['workforce'][pop_type] * self.pop_type_info[pop_type].wage_weight for pop_type in
+            one_line_data["raw_data"][
+                'workforce']) / workforce_population if workforce_population else 'Null'
 
         one_line_data["processed_data"]['input_cost'] = input_cost
         one_line_data["processed_data"]['output_cost'] = output_cost

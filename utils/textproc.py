@@ -13,6 +13,7 @@ OPERATOR_PATTERN = re.compile(r"(<|<=|=|>=|>)")
 GOOD_MODIFIER_PATTERN = re.compile(r"\bgoods_(?P<io_type>input|output)_(?P<key_word>[\w\-]+?)_(?P<am_type>add|mult)\b")
 BUILDING_EMPLOYMENT_MODIFIER_PATTERN = re.compile(
     r"\bbuilding_employment_(?P<key_word>[\w\-]+?)_(?P<am_type>add|mult)\b")
+BUILDING_SUBSISTENCE_OUTPUT_MODIFIER_PATTERN = re.compile(r"\bbuilding_subsistence_output_(?P<am_type>add|mult)\b")
 
 # 其他变量
 LIST_LOGIC_KEYS = ["if", "else_if", "else", "add", "multiply", "divide"]
@@ -284,7 +285,6 @@ def get_nested_dict_from_text(text: str, override=True) -> dict:
 # ------------------------------------------------------------------------------------------
 def wrong_format(modifier_name: str):
     print(f"{modifier_name}存在格式错误")
-    return None
 
 
 # 以下函数用于解析modifier
@@ -301,19 +301,23 @@ def parse_good_modifier(modifier: str):
         }
 
 
-def parse_building_modifier(modifier: str):  # TODO 这个函数仅能识别buildings_employment_开头的modifier，之后也许可以升级
+def parse_building_modifier(modifier: str) -> dict:  # TODO 这个函数仅能识别buildings_employment_开头的modifier，之后也许可以升级
     modifier_match = BUILDING_EMPLOYMENT_MODIFIER_PATTERN.match(modifier)
-    if modifier_match is None:
-        return None
-    else:
+    if modifier_match is not None:
         return {
-            "category": "building_employment",
+            "category": ("building", "employment"),
             "key_word": modifier_match.group("key_word"),
+            "am_type": modifier_match.group("am_type")
+        }
+    modifier_match = BUILDING_SUBSISTENCE_OUTPUT_MODIFIER_PATTERN.match(modifier)
+    if modifier_match is not None:
+        return {
+            "category": ("building", "subsistence_output"),
             "am_type": modifier_match.group("am_type")
         }
 
 
-def parse_modifier(modifier: str):
+def parse_modifier(modifier: str) -> dict | None:
     split_list = modifier.split("_")
     if len(split_list) < 3:  # modifier应该至少3个单位长
         return wrong_format(modifier)
@@ -336,7 +340,7 @@ def parse_modifier_dict(modifier_dict: dict) -> dict:
         if modifier_info is None:
             continue
         if not isinstance(value, (int, float)):
-            print(f"{modifier}的值{value}不是数值")
+            print(f"{modifier}的值{value}不是数值，因此被忽略")
             continue
         modifier_info["value"] = value
         modifier_info_dict[modifier] = modifier_info

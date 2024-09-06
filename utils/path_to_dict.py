@@ -8,16 +8,26 @@ import os
 import utils.textproc as tp
 
 # 文件路径
-GOODS_PATH = "common\\goods"  # 商品
-POP_TYPES_PATH = "common\\pop_types"  # pop类型
-PM_PATH = "common\\production_methods"  # 生产方式
-PMG_PATH = "common\\production_method_groups"  # 生产方式组
-BUILDINGS_PATH = "common\\buildings"  # 建筑
-SCRIPT_VALUE_PATH = "common\\script_values"
-TECHNOLOGIES_PATH = "common\\technologies"
 
 LOCALIZATION_PATH = "localization\\simp_chinese"  # 本地化
+
+GAME_OBJECT_PATH_DICT = {
+    "buildings": "buildings",
+    "goods": "goods",
+    "laws": "laws",
+    "pop_types": "pop_types",
+    "power_bloc_identities": "power_bloc_identities",
+    "power_bloc_principles": "power_bloc_principles",
+    "production_method_groups": "production_method_groups",
+    "production_methods": "production_methods",
+    "script_values": "script_values",
+    "technologies": "technology\\technologies"
+}
 
 
 def get_nested_dict(folder_path: str, path="common") -> dict:
     return tp.get_nested_dict_from_path(os.path.join(path, folder_path))
+
+
+def get_game_object_dict(game_objects_list: list) -> dict:
+    return {game_object: get_nested_dict(GAME_OBJECT_PATH_DICT[game_object]) for game_object in game_objects_list}
