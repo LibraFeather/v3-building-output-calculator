@@ -7,22 +7,15 @@ class Name:
     localization_value: str
 
 
-# 生产方式群应用此类节点
-@dataclass
-class NormalNode(Name):
-    children: list
-
-
 @dataclass
 class POPTypeNode(Name):
     wage_weight: int | float
     subsistence_income: bool
 
 
-# 建筑应用此类节点
 @dataclass
-class BuildingNode(NormalNode):
-    building_cost: int | float
+class GoodNode(Name):
+    cost: int | float
 
 
 # 生产方式应用此类节点
@@ -43,3 +36,15 @@ class PMNode(Name):
 @dataclass
 class TechNode(Name):
     era: str
+
+
+# 生产方式群应用此类节点
+@dataclass
+class NormalNode(Name):
+    children: list
+
+
+# 建筑应用此类节点
+@dataclass
+class BuildingNode(NormalNode):
+    building_cost: int | float

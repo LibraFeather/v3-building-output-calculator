@@ -46,18 +46,22 @@ class BuildingInfoTree:
         return technologies_dict
 
     # ! 预备部分，创建各项存储字典
-    @staticmethod
-    def __get_goods_info(good_blocks_dict) -> dict:
+    def __get_goods_info(self, good_blocks_dict) -> dict:
         """
         商品名称: 基础价格
         """
         goods_dict = {}
         for good in good_blocks_dict:
             if s.COST in good_blocks_dict[good]:
-                goods_dict[good] = good_blocks_dict[good][s.COST] * GOODS_COST_OFFSET.get(good, 1.0)
+                cost = good_blocks_dict[good][s.COST] * GOODS_COST_OFFSET.get(good, 1.0)
             else:
-                goods_dict[good] = 0
+                cost = 0
                 print(f"未找到{good}的{s.COST}，因此假定其为0")
+            goods_dict[good] = mm.GoodNode(
+                localization_key=good,
+                localization_value=self.localization_info[good],
+                cost=cost
+            )
         return goods_dict
 
     def __get_pops_info(self, pop_blocks_dict) -> dict:

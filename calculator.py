@@ -56,8 +56,7 @@ class Calculator:
                 one_line_data_list.append(one_line_data_finished)
         return one_line_data_list
 
-    @staticmethod
-    def __generate_one_line_data(combination: tuple, pmgs_list: list) -> dict:
+    def __generate_one_line_data(self, combination: tuple, pmgs_list: list) -> dict:
         def check_workforce_positive(workforce_dict: dict) -> dict:
             for _, v in workforce_dict.items():
                 if v < 0:
@@ -65,10 +64,10 @@ class Calculator:
             return workforce_dict
 
         def calculate_good(goods_add, goods_mult):
-            for good in goods_add:
-                if good in goods_mult:
-                    mult = 1 + goods_mult[good]
-                    goods_add[good] = goods_add[good] * mult if mult > 0 else 0
+            for _good in goods_add:
+                if _good in goods_mult:
+                    mult = 1 + goods_mult[_good]
+                    goods_add[_good] = goods_add[_good] * mult if mult > 0 else 0
             return goods_add
 
         def add_object_to_list(objects_list: list, new_list: list) -> None:
@@ -86,7 +85,8 @@ class Calculator:
             "pm_data": {},
             "processed_data": {},
             "other_data": {"era": 0, "highest_tech": "", "techs_all": "", "unlocking_principles": "",
-                           "unlocking_identity": "", "unlocking_laws": "", "disallowing_laws": ""}
+                           "unlocking_identity": "", "unlocking_laws": "", "disallowing_laws": ""},
+            "goods_data": {}
         }
 
         # TODO 这里需要进一步简化代码
@@ -129,6 +129,10 @@ class Calculator:
             [identity.localization_value for identity in unlocking_identity])
         one_line_data["other_data"]["unlocking_laws"] = " ".join([law.localization_value for law in unlocking_laws])
         one_line_data["other_data"]["disallowing_laws"] = " ".join([law.localization_value for law in disallowing_laws])
+
+        for good, good_info in self.goods_info.items():
+            one_line_data["goods_data"][good_info.localization_value] = one_line_data["raw_data"]["goods_output"].get(
+                good, 0) - one_line_data["raw_data"]["goods_input"].get(good, 0)
         return one_line_data
 
     def __calculate_data(self, one_line_data: dict, building) -> dict:
@@ -140,9 +144,9 @@ class Calculator:
         回报率 = 商品产出总产值/商品投入总产值
         工资倍率 = 劳动力工资权重的加权平均
         """
-        input_cost = sum(one_line_data["raw_data"]['goods_input'][good] * self.goods_info[good]
+        input_cost = sum(one_line_data["raw_data"]['goods_input'][good] * self.goods_info[good].cost
                          for good in one_line_data["raw_data"]['goods_input'])
-        output_cost = sum(one_line_data["raw_data"]['goods_output'][good] * self.goods_info[good]
+        output_cost = sum(one_line_data["raw_data"]['goods_output'][good] * self.goods_info[good].cost
                           for good in one_line_data["raw_data"]['goods_output'])
         workforce_population = sum(one_line_data["raw_data"]['workforce'].values())
         profit = output_cost - input_cost + sum(
@@ -178,9 +182,15 @@ class Calculator:
         colum_rename = column_pmg | self.COLUMN_HEADERS
         rows = []
         for one_line_data in one_line_data_list:
-            row = one_line_data["pm_data"] | one_line_data["processed_data"] | one_line_data["other_data"]
+            row = one_line_data["pm_data"] | one_line_data["processed_data"] | one_line_data["other_data"] | \
+                  one_line_data["goods_data"]
             rows.append(row)
         building_info_df = pd.DataFrame(rows)
+
+        for good_info in self.goods_info.values():
+            if (building_info_df[good_info.localization_value] == 0).all():
+                building_info_df.drop(good_info.localization_value, axis=1, inplace=True)
+
         building_info_df.rename(columns=colum_rename, inplace=True)
         building_info_df.to_excel(
             f'{OUTPUT_PATH}\\buildings\\{building.localization_value}_{building.localization_key}.xlsx', index=False)
@@ -212,7 +222,7 @@ class Calculator:
                         pm_list.insert(2, automation_pm)
                 pm_data = {column_4pm[i]: pm_list[i] for i in range(len(column_4pm))}
                 row = {"建筑": building.localization_value} | pm_data | one_line_data["processed_data"] | one_line_data[
-                    "other_data"]
+                    "other_data"] | one_line_data["goods_data"]
                 rows.append(row)
         summary_table_df = pd.DataFrame(rows)
         summary_table_df.rename(columns=self.COLUMN_HEADERS, inplace=True)

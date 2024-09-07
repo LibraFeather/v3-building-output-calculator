@@ -12,16 +12,16 @@
 - [x] 利润考虑自给产出
 - [x] 改进本地化文件的读取方式，以应对`replace`文件夹
 - [x] `unscaled`中的`building_employment_<pop_type>_add`确实不受等级和劳动力修正
+- [x] 显示具体商品的增减
 ### 高优先级
-- [ ] 显示具体商品的增减
-- [ ] 研究如何将程序转化为exe文件，以在无Python环境下运行
 - [ ] 显示建筑所在的建筑组
+- [ ] 研究如何将程序转化为exe文件，以在无Python环境下运行
 ### 中优先级
 - [ ] 价格配置文件似乎不方便用户使用，需要改进
 ### 低优先级
+- [ ] 法律要求的显示有点令人困惑，需要优化
 - [ ] 更好的游戏对象重复功能识别，现版本无法区分mod内重复和mod和原版文件的重复(纠错功能是否应该分离？)
 - [ ] `utils.textproc.parse_building_modifier`支持所有类型的`building modifier`
-- [ ] 法律要求的显示有点令人困惑，需要优化
 ## 代码优化
 - [x] `utils.textproc.parse_text_block`过于复杂，需要重构
 - [ ] `tree.BuildingInfoTree.__get_pms_info`对`modifier`的处理过于复杂，需要重构

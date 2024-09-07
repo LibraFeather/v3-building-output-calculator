@@ -22,7 +22,8 @@ LIST_LOGIC_KEYS = ["if", "else_if", "else", "add", "multiply", "divide"]
 
 
 # ------------------------------------------------------------------------------------------
-def extract_bracket_content(text: str, start: int, char: str):
+# TODO 以下为旧的文本提取函数，现仅用于本地化，待重构
+def extract_bracket_content(text: str, start: int, char: str) -> tuple:
     """
     提取给定字符之间的内容
     :param text: 待检索文本
@@ -50,7 +51,6 @@ def extract_bracket_content(text: str, start: int, char: str):
             end = text.find(char, first_quote_pos + 1)
             if end != -1:
                 return text[start:first_quote_pos - 1], text[first_quote_pos + 1:end]
-    return None
 
 
 def extract_all_blocks(pattern: str, text: str, char: str) -> dict:
@@ -70,13 +70,13 @@ def extract_all_blocks(pattern: str, text: str, char: str) -> dict:
         if block:
             if name in dict_block.keys():
                 pass
-                # print(f"{name}重复出现")
             else:
                 dict_block[name] = block
     return dict_block
 
 
 # ------------------------------------------------------------------------------------------
+# 以下函数专门处理本地化
 def localization_combiner() -> str:
     text = ""
     localization_paths_list = pp.get_localization_paths()
@@ -107,7 +107,7 @@ def calibrate_localization_dict(localization_dict_used: dict, localization_dict_
 
 # ------------------------------------------------------------------------------------------
 # 以下函数用于通过递归方法获得递归字典
-def find_first_operator(text: str, start=0):
+def find_first_operator(text: str, start=0) -> tuple:
     """
     寻找operator的位置
     :param text: 待查询字符串
@@ -124,7 +124,7 @@ def find_first_operator(text: str, start=0):
     return operator, start_pos, end_pos
 
 
-def convert_to_number(value: str):
+def convert_to_number(value: str) -> int | float | str:
     """
     尝试将字符串转换为数值类型
     """
@@ -199,7 +199,7 @@ def parse_text_block(start: int, text: str) -> tuple:
     return name, first_non_space.group(), second_non_space_start
 
 
-def convert_text_into_dict(text: str, blocks_dict=None, logic_keys_dict=None, override=True):
+def convert_text_into_dict(text: str, blocks_dict=None, logic_keys_dict=None, override=True) -> dict:
     if blocks_dict is None:
         blocks_dict = {}
     if logic_keys_dict is None:
@@ -255,7 +255,7 @@ def divide_dict_value(blocks_dict: dict) -> dict:
     :return: 递归解析后的dict
     """
 
-    def process_content(content):
+    def process_content(content) -> str | list | dict:
         """
         处理字符串内容，递归解析或分割为列表
         """
@@ -295,12 +295,12 @@ def get_nested_dict_from_text(text: str, override=True) -> dict:
 
 
 # ------------------------------------------------------------------------------------------
+# 以下函数用于解析modifier
 def wrong_format(modifier_name: str):
     print(f"{modifier_name}存在格式错误")
 
 
-# 以下函数用于解析modifier
-def parse_good_modifier(modifier: str):
+def parse_good_modifier(modifier: str) -> dict | None:
     modifier_match = GOOD_MODIFIER_PATTERN.match(modifier)
     if modifier_match is None:
         return wrong_format(modifier)
@@ -367,6 +367,7 @@ def calibrate_modifier_dict(modifier_dict: dict) -> dict:
 
 
 # ------------------------------------------------------------------------------------------
+# 其他函数
 def get_era_num(tech: str, era: str) -> int:
     num_match = re.search(r"\d+", era)
     if num_match:
