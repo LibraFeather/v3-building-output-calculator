@@ -190,6 +190,9 @@ class Calculator:
         for good_info in self.goods_info.values():
             if (building_info_df[good_info.localization_value] == 0).all():
                 building_info_df.drop(good_info.localization_value, axis=1, inplace=True)
+        for key in list(self.COLUMN_HEADERS.keys())[9:]:
+            if (building_info_df[key] == "").all():
+                building_info_df.drop(key, axis=1, inplace=True)
 
         building_info_df.rename(columns=colum_rename, inplace=True)
         name = f"{building.building_group_display.localization_value}_{building.localization_value}_{building.localization_key}.xlsx"
