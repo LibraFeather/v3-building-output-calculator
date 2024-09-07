@@ -13,6 +13,9 @@ SUBSISTENCE_INCOME = "subsistence_income"
 # building
 REQUIRED_CONSTRUCTION = "required_construction"
 PRODUCTION_METHOD_GROUPS = "production_method_groups"
+BUILDING_GROUP = "building_group"
+#  building_group
+PARENT_GROUP = "parent_group"
 # pmg
 PRODUCTION_METHODS = "production_methods"
 # pm

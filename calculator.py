@@ -192,9 +192,10 @@ class Calculator:
                 building_info_df.drop(good_info.localization_value, axis=1, inplace=True)
 
         building_info_df.rename(columns=colum_rename, inplace=True)
+        name = f"{building.building_group_display.localization_value}_{building.localization_value}_{building.localization_key}.xlsx"
         building_info_df.to_excel(
-            f'{OUTPUT_PATH}\\buildings\\{building.localization_value}_{building.localization_key}.xlsx', index=False)
-        print(f'{building.localization_value}_{building.localization_key}输出成功！')
+            f'{OUTPUT_PATH}\\buildings\\{name}', index=False)
+        print(f'{name}输出成功！')
 
     def output_every_building(self):
         for building, one_line_data_list in self.building_output_info_list:
@@ -221,8 +222,9 @@ class Calculator:
                         pm_list.remove(automation_pm)
                         pm_list.insert(2, automation_pm)
                 pm_data = {column_4pm[i]: pm_list[i] for i in range(len(column_4pm))}
-                row = {"建筑": building.localization_value} | pm_data | one_line_data["processed_data"] | one_line_data[
-                    "other_data"] | one_line_data["goods_data"]
+                row = {"建筑组": building.building_group_display.localization_value} | {
+                    "建筑": building.localization_value} | pm_data | one_line_data["processed_data"] | one_line_data[
+                          "other_data"] | one_line_data["goods_data"]
                 rows.append(row)
         summary_table_df = pd.DataFrame(rows)
         summary_table_df.rename(columns=self.COLUMN_HEADERS, inplace=True)

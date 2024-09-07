@@ -13,6 +13,7 @@ LOCALIZATION_PATH = "localization\\simp_chinese"  # 本地化
 
 GAME_OBJECT_PATH_DICT = {
     "buildings": "buildings",
+    "building_groups": "building_groups",
     "goods": "goods",
     "laws": "laws",
     "pop_types": "pop_types",

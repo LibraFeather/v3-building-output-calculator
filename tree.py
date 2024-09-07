@@ -9,16 +9,24 @@ import constants.str as s
 import models.model as mm
 from config.goods_cost import GOODS_COST_OFFSET
 
+NULL_BUILDING_GROUP = mm.BuildingGroupNode(
+    localization_key="Null",
+    localization_value="Null",
+    parent_group=[]
+)
+
 
 class BuildingInfoTree:
     def __init__(self):
-        game_objet_need = ["buildings", "goods", "laws", "pop_types", "power_bloc_identities", "power_bloc_principles",
+        game_objet_need = ["buildings", "building_groups", "goods", "laws", "pop_types", "power_bloc_identities",
+                           "power_bloc_principles",
                            "production_method_groups", "production_methods", "script_values", "technologies"]
         game_object_dict = ptd.get_game_object_dict(game_objet_need)
 
         self.localization_info = self.__get_localization_info(game_object_dict)
 
         self.scrit_values_info = game_object_dict["script_values"]
+        self.building_groups_info = self.__get_building_groups_info(game_object_dict["building_groups"])
         self.buildings_info = self.__get_buildings_info(game_object_dict["buildings"])
         self.goods_info = self.__get_goods_info(game_object_dict["goods"])
         self.laws_info = game_object_dict["laws"]
@@ -32,6 +40,32 @@ class BuildingInfoTree:
         self.automation_pm_list = self.__get_automation_pm_list()
 
         self.tree = self.generate_tree()
+
+    def __get_building_groups_info(self, building_groups_blocks_dict) -> dict:
+        def get_parent_groups_list(_building_group: str, _building_groups_blocks_dict: dict) -> list:
+            _parent_group = _building_groups_blocks_dict[_building_group]
+            parent_groups_list = [_building_group]
+            while _parent_group:
+                parent_groups_list.append(_parent_group)
+                _parent_group = _building_groups_blocks_dict[_parent_group]
+            return parent_groups_list
+
+        building_groups_dict = {}
+        for building_group in building_groups_blocks_dict:
+            if s.PARENT_GROUP in building_groups_blocks_dict[building_group]:
+                parent_group = building_groups_blocks_dict[building_group][s.PARENT_GROUP]
+            else:
+                parent_group = ""
+            building_groups_dict[building_group] = parent_group
+
+        new_building_groups_dict = {}
+        for building_group in building_groups_blocks_dict:
+            new_building_groups_dict[building_group] = mm.BuildingGroupNode(
+                localization_key=building_group,
+                localization_value=self.localization_info[building_group],
+                parent_group=get_parent_groups_list(building_group, building_groups_dict)
+            )
+        return new_building_groups_dict
 
     @staticmethod
     def __get_technologies_info(technology_blocks_dict) -> dict:
@@ -117,7 +151,12 @@ class BuildingInfoTree:
             else:
                 pmgs_list = []
                 print(f"{building}格式异常，未找到任何生产方式组")
-            buildings_dict[building] = {'cost': building_cost, 'pmgs': pmgs_list}
+            if s.BUILDING_GROUP in building_blocks_dict[building]:
+                building_group = building_blocks_dict[building][s.BUILDING_GROUP]
+            else:
+                print(f"{building}格式异常，未找到建筑组，因此被忽略")
+                continue
+            buildings_dict[building] = {'cost': building_cost, 'pmgs': pmgs_list, "bg": building_group}
         return buildings_dict
 
     @staticmethod
@@ -223,7 +262,7 @@ class BuildingInfoTree:
             key for game_object in game_object_list_dict
             if game_object not in ["script_values", "power_bloc_principles"]
             for key in game_object_list_dict[game_object]
-            ]
+        ]
 
         principle_keys = game_object_list_dict["power_bloc_principles"]  # 原则特殊，需要单独处理
 
@@ -271,14 +310,28 @@ class BuildingInfoTree:
     def parse_buildings(self) -> list:
         buildings_list = []
         for building, building_info in self.buildings_info.items():
+            building_group, building_group_display = self.parse_building_group(self.buildings_info[building]["bg"])
             buildings_list.append(mm.BuildingNode(
                 localization_key=building,
                 localization_value=self.localization_info[building],
                 children=self.parse_pmgs(building_info['pmgs']),
-                building_cost=building_info['cost']
+                building_cost=building_info['cost'],
+                building_group=building_group,
+                building_group_display=building_group_display
             ))
 
         return buildings_list
+
+    def parse_building_group(self, building_group: str) -> tuple:
+        if building_group in self.building_groups_info:
+            building_group_info = self.building_groups_info[building_group]
+            if len(building_group_info.parent_group) > 1 and building_group_info.parent_group[-1] == "bg_manufacturing":
+                return building_group_info, self.building_groups_info[building_group_info.parent_group[-2]]
+            else:
+                return building_group_info, self.building_groups_info[building_group_info.parent_group[-1]]
+        else:
+            print(f"{building_group}无定义")
+            return NULL_BUILDING_GROUP, NULL_BUILDING_GROUP
 
     def parse_pmgs(self, pmgs: list) -> list:
         pmgs_list = []

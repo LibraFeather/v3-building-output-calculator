@@ -8,6 +8,11 @@ class Name:
 
 
 @dataclass
+class BuildingGroupNode(Name):
+    parent_group: list
+
+
+@dataclass
 class POPTypeNode(Name):
     wage_weight: int | float
     subsistence_income: bool
@@ -48,3 +53,5 @@ class NormalNode(Name):
 @dataclass
 class BuildingNode(NormalNode):
     building_cost: int | float
+    building_group: BuildingGroupNode
+    building_group_display: BuildingGroupNode
