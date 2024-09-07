@@ -9,6 +9,8 @@ import utils.pathproc as pp
 # 正则表达式
 NAME_PATTERN = re.compile(r"[\w\-.]+")
 OPERATOR_PATTERN = re.compile(r"(<|<=|=|>=|>)")
+LOCALIZATION_PATTERN = r"^\s+[\w\-.]+:.+"
+LOCALIZATION_REPLACE_PATTERN = r"\$([\w\-.]+)\$"
 
 GOOD_MODIFIER_PATTERN = re.compile(r"\bgoods_(?P<io_type>input|output)_(?P<key_word>[\w\-]+?)_(?P<am_type>add|mult)\b")
 BUILDING_EMPLOYMENT_MODIFIER_PATTERN = re.compile(
@@ -19,26 +21,7 @@ BUILDING_SUBSISTENCE_OUTPUT_MODIFIER_PATTERN = re.compile(r"\bbuilding_subsisten
 LIST_LOGIC_KEYS = ["if", "else_if", "else", "add", "multiply", "divide"]
 
 
-def txt_combiner(path: str) -> str:
-    content = ""
-    file_paths_list = pp.get_file_paths_list(path)
-    if file_paths_list:
-        for file_path in file_paths_list:
-            if not file_path.endswith(".info"):
-                with open(file_path, "r", encoding="utf-8-sig") as file:
-                    content += file.read() + "\n"
-    else:
-        print(f"找不到{path}，请确认路径是否设置正确")
-    return content
-
-
-def txt_combiner_remove_comment(path: str) -> str:
-    """
-    txt_combiner的移除注释版本，仅移除#后的内容，不要在处理本地化文件的时候使用这个！
-    """
-    return re.sub(r"#.*$", "", txt_combiner(path), flags=re.MULTILINE)
-
-
+# ------------------------------------------------------------------------------------------
 def extract_bracket_content(text: str, start: int, char: str):
     """
     提取给定字符之间的内容
@@ -91,6 +74,35 @@ def extract_all_blocks(pattern: str, text: str, char: str) -> dict:
             else:
                 dict_block[name] = block
     return dict_block
+
+
+# ------------------------------------------------------------------------------------------
+def localization_combiner() -> str:
+    text = ""
+    localization_paths_list = pp.get_localization_paths()
+    for localization_path in localization_paths_list:
+        with open(localization_path, "r", encoding="utf-8-sig") as file:
+            text += file.read() + "\n"
+    return text
+
+
+def extract_localization_blocks(text: str) -> dict:
+    return extract_all_blocks(LOCALIZATION_PATTERN, text, "\"")
+
+
+def get_localization_dict() -> dict:
+    text = localization_combiner()
+    return extract_localization_blocks(text)
+
+
+def calibrate_localization_dict(localization_dict_used: dict, localization_dict_all: dict):
+    for key, value in localization_dict_used.items():
+        replace_list = re.findall(LOCALIZATION_REPLACE_PATTERN, value)
+        if replace_list:
+            for replace in replace_list:
+                if replace in localization_dict_all.keys():
+                    value = value.replace(f"${replace}$", localization_dict_all[replace])
+            localization_dict_used[key] = value
 
 
 # ------------------------------------------------------------------------------------------

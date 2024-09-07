@@ -5,13 +5,9 @@ import utils.textproc as tp
 import utils.path_to_dict as ptd
 
 # TODO 按照类型排列
-from constants.path import LOCALIZATION_PATH
 import constants.str as s
 import models.model as mm
 from config.goods_cost import GOODS_COST_OFFSET
-
-LOCALIZATION_PATTERN = r"^\s+[\w\-.]+:.+"
-LOCALIZATION_REPLACE_PATTERN = r"\$([\w\-.]+)\$"
 
 
 class BuildingInfoTree:
@@ -214,16 +210,16 @@ class BuildingInfoTree:
 
     @staticmethod
     def __get_localization_info(game_object_dict) -> dict:
-        content = tp.txt_combiner(LOCALIZATION_PATH)
-        localization_dict_all = tp.extract_all_blocks(LOCALIZATION_PATTERN, content, "\"")
+        localization_dict_all = tp.get_localization_dict()
 
         game_object_list_dict = {game_object: list(game_object_dict[game_object].keys()) for game_object in
                                  game_object_dict}
 
-        localization_keys_used = []
-        for game_object in game_object_list_dict:
-            if game_object != "power_bloc_principles":
-                localization_keys_used += game_object_list_dict[game_object]
+        localization_keys_used = [
+            key for game_object in game_object_list_dict
+            if game_object not in ["script_values", "power_bloc_principles"]
+            for key in game_object_list_dict[game_object]
+            ]
 
         principle_keys = game_object_list_dict["power_bloc_principles"]  # 原则特殊，需要单独处理
 
@@ -248,13 +244,7 @@ class BuildingInfoTree:
                 print(f"找不到{key}的本地化")
                 localization_dict_used[key] = key
 
-        for key, value in localization_dict_used.items():
-            replace_list = re.findall(LOCALIZATION_REPLACE_PATTERN, value)
-            if replace_list:
-                for replace in replace_list:
-                    if replace in localization_dict_all.keys():
-                        value = value.replace(f"${replace}$", localization_dict_all[replace])
-                localization_dict_used[key] = value
+        tp.calibrate_localization_dict(localization_dict_used, localization_dict_all)
 
         # dummy building的本地化值过长，需要被替换，这里用本地化值的长度作为依据
         for building in game_object_list_dict["buildings"]:

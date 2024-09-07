@@ -6,7 +6,7 @@
 import os
 import json
 
-from config.path import MOD_PATH, VANILLA_PATH
+import config.path as cp
 
 REPLACE_PATH_STR = "replace_paths"
 GAME_CUSTOM_DATA_STR = "game_custom_data"
@@ -18,7 +18,7 @@ replace_paths_list = []
 
 def update_replace_paths_list():
     global replace_paths_list  # 这里需要对其赋值，因此必须使用global
-    metadata_path = os.path.join(MOD_PATH, METADATA_PATH)
+    metadata_path = os.path.join(cp.MOD_PATH, METADATA_PATH)
     if os.path.exists(metadata_path):
         with open(metadata_path, "r", encoding="utf-8-sig") as file:
             config_dict = json.load(file)
@@ -41,15 +41,37 @@ def get_file_paths_list(folder_path: str):
                 file_paths[relative_path] = os.path.join(root, file)
 
     file_paths = {}
-    input_folder_path = os.path.join(MOD_PATH, folder_path)
-    vanilla_folder_path = os.path.join(VANILLA_PATH, folder_path)
+    mod_folder_path = os.path.join(cp.MOD_PATH, folder_path)
+    vanilla_folder_path = os.path.join(cp.VANILLA_PATH, folder_path)
 
-    if folder_path in replace_paths_list and os.path.exists(input_folder_path):  # 如果路径在replace_paths_list内，则忽略vanilla_folder_path
-        update_paths_dict(input_folder_path)
+    if folder_path in replace_paths_list and os.path.exists(
+            mod_folder_path):  # 如果路径在replace_paths_list内，则忽略vanilla_folder_path
+        update_paths_dict(mod_folder_path)
         return list(file_paths.values())
 
     update_paths_dict(vanilla_folder_path)
-    if os.path.exists(input_folder_path):  # 检查input文件夹内是否有相同文件并替换
-        update_paths_dict(input_folder_path)
+    if os.path.exists(mod_folder_path):  # 检查input文件夹内是否有相同文件并替换
+        update_paths_dict(mod_folder_path)
 
     return list(file_paths.values())
+
+
+def get_localization_paths() -> list:
+    def add_path_to_list(path: str, paths_list: list):
+        for root, _, files in os.walk(path):
+            for file in files:
+                paths_list.append(os.path.join(root, file))
+
+    localization_paths_list = []
+    mod_localization_path = os.path.join(cp.MOD_PATH, "localization\\replace")
+    if os.path.exists(mod_localization_path):
+        mod_localization_path = os.path.join(mod_localization_path, cp.LOCALIZATION_PATH)
+        add_path_to_list(mod_localization_path, localization_paths_list)
+        return localization_paths_list
+    mod_localization_path = os.path.join(cp.MOD_PATH, f"localization\\{cp.LOCALIZATION_PATH}\\replace")
+    if os.path.exists(mod_localization_path):
+        add_path_to_list(mod_localization_path, localization_paths_list)
+        return localization_paths_list
+    vanilla_localization_path = os.path.join(cp.VANILLA_PATH, f"localization\\{cp.LOCALIZATION_PATH}")
+    add_path_to_list(vanilla_localization_path, localization_paths_list)
+    return localization_paths_list
