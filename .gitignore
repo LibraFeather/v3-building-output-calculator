@@ -1,12 +1,12 @@
 # 忽略文件夹
+dist/
+build/
 _input/
 _output/
+_test/
 .vscode/
 .idea/
 __pycache__/
 
-
-# 忽略文件
-test.py
-trash.py
-input_test.txt
+# 忽略特定后缀
+*.spec
