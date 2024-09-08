@@ -2,7 +2,7 @@ import pandas as pd
 import itertools
 from collections import Counter
 
-from tree import BuildingInfoTree
+from models.tree import BuildingInfoTree
 from constants.path import OUTPUT_PATH
 
 

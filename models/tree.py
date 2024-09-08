@@ -7,7 +7,7 @@ import utils.path_to_dict as ptd
 # TODO 按照类型排列
 import constants.str as s
 import models.model as mm
-from config.goods_cost import GOODS_COST_OFFSET
+from config.config import GOODS_COST_OFFSET
 
 NULL_BUILDING_GROUP = mm.BuildingGroupNode(
     localization_key="Null",
