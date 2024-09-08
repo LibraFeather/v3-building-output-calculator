@@ -6,6 +6,7 @@
 import re
 import utils.pathproc as pp
 import utils.error as error
+import utils.read_file as rf
 
 # 正则表达式
 OPERATOR_PATTERN = re.compile(r"(<|<=|=|>=|>)")
@@ -19,18 +20,6 @@ BUILDING_SUBSISTENCE_OUTPUT_MODIFIER_PATTERN = re.compile(r"\bbuilding_subsisten
 
 # 其他变量
 LIST_LOGIC_KEYS = ["if", "else_if", "else", "add", "multiply", "divide"]
-
-
-# ------------------------------------------------------------------------------------------
-def read_file_with_encoding(file_path: str) -> str:
-    encodings = ["utf-8-sig", "gb2312"]
-    for encoding in encodings:
-        try:
-            with open(file_path, "r", encoding=encoding) as file:
-                return file.read()
-        except UnicodeDecodeError:
-            continue  # 如果解码失败，继续尝试下一种编码
-    raise ValueError(f"错误：{file_path}解码失败")
 
 
 # ------------------------------------------------------------------------------------------
@@ -230,7 +219,7 @@ def convert_text_into_dict_from_path(path: str, override=True) -> dict:
     logic_keys_dict = {logic_key: -1 for logic_key in LIST_LOGIC_KEYS}
     for file_path in list_file_paths:  # 对文件分别进行处理，以防止格式错误造成污染
         if not file_path.endswith(".info"):  # 忽略info文件，这个文件的作用类似注释
-            text = read_file_with_encoding(file_path)
+            text = rf.read_file_with_encoding(file_path)
             blocks_dict = convert_text_into_dict(text, blocks_dict, logic_keys_dict, override, file_path)
     return blocks_dict
 

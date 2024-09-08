@@ -64,4 +64,4 @@ Calista C.Manstainne，Recognized User L，07/09/2024
 8. 程序会将`technology`的`era`转化为`int`变量，解析方式是通过正则表达式捕获`era`变量中的第一段连续数字，这可能无法处理某些命名。
 9. 由于原则组下的原则在原版中不存在对应的本地化文本，因此本工具会先通过正则表达式捕获`principle_(?P<name>[\w\-]+?)_(?P<value>\d+)`，然后寻找
 `principle_group_<name>`的本地化文本，这可能无法处理某些命名。
-10. 本程序可能无法处理本地化中的`replace`文件夹。
+10. 本程序可能无法正确处理本地化中的`replace`文件夹。

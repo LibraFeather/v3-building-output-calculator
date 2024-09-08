@@ -20,6 +20,10 @@ def wrong_type(object_name: str, object_type, value=None):
     assumption_value(error_info, value)
 
 
+def wrong_path(path: str):
+    print(f"错误：路径{path}设置错误")
+
+
 def assumption_value(error_info: str, value):
     if value is None:
         print(error_info)

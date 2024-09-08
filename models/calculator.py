@@ -222,9 +222,12 @@ class Calculator:
 
     def output_all_buildings(self):
         rows = []
-        max_len_pmg = max(
-            len(one_line_data["pm_data"]) for building_info in self.building_output_info_list for one_line_data in
-            building_info[1])
+        max_len_pmg = 0
+        if self.building_output_info_list:
+            max_len_pmg = max(
+                len(one_line_data["pm_data"]) for building_info in self.building_output_info_list for one_line_data in
+                building_info[1])
+
         is_pmg_count_leq_4 = bool(max_len_pmg <= 4)
         if is_pmg_count_leq_4:
             column_4pm = ["基础", "次要", "自动化", "其他"]
