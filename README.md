@@ -6,9 +6,13 @@ Calista C.Manstainne，Recognized User L，07/09/2024
 
 - 通过读取游戏文件，自动计算建筑的产出信息，结果以excel文件形式输出，以方便使用者在excel中处理数据。
 
-适配版本：1.7.6
+适配游戏版本：1.7.6，在更高或更低版本下运行可能发生意料之外的错误。
 
-## 使用前操作
+## 版本说明
+
+此工具分为py版和exe版，后者通过pyinstaller生成，以在无Python的环境下使用。
+
+## 使用前操作(仅限py版)
 
 ### 安装Python
 
@@ -31,8 +35,8 @@ Calista C.Manstainne，Recognized User L，07/09/2024
 
 ## 使用方法
 
-1. **配置游戏文件路径**：打开`config\path.py`文件，将`VANILLA_PATH`变量修改为`Victoria 3\game`的路径。
-2. **运行程序**：运行`calculator.py`。
+1. **配置游戏文件路径**：打开`config\path.json`文件，将`VANILLA_PATH`变量修改为`Victoria 3\game`的路径。
+2. **运行程序**：运行`main.py`(py版)或`main.exe`(exe版)。
 3. **查看结果**：结果会被输出至`_output\buildings`文件夹。
 
 ## 注意事项
@@ -44,7 +48,7 @@ Calista C.Manstainne，Recognized User L，07/09/2024
 1. 本工具可以计算mod建筑的产值，但是可能因为代码格式导致程序出错。
 2. 在运行过程中，如果遇到异常，本工具会尝试显示出现了何种格式问题。
 3. 计算mod建筑时，可以选择：
-   1. 在`config\path.py`文件里将`MOD_PATH`变量修改为mod的路径，程序会自动读取`metadata.json`，以确定哪些文件夹需要覆盖原版文件。
+   1. 在`config\path.json`文件里将`MOD_PATH`变量修改为mod的路径，程序会自动读取`metadata.json`，以确定哪些文件夹需要覆盖原版文件。
    2. 将mod文件复制进`_input`文件夹（不是整个文件夹，而是文件夹内的文件）。
 4. mod建筑的本地化名称不能超过50个字符，否则会被替换为dummy，以避免因为文件路径过长而无法输出。
 5. 在显示建筑组时，如果建筑组的根建筑组是`bg_manufacturing`，那么显示的建筑组将会是`bg_manufacturing`的下一级子建筑组（如果存在）。
@@ -60,3 +64,4 @@ Calista C.Manstainne，Recognized User L，07/09/2024
 8. 程序会将`technology`的`era`转化为`int`变量，解析方式是通过正则表达式捕获`era`变量中的第一段连续数字，这可能无法处理某些命名。
 9. 由于原则组下的原则在原版中不存在对应的本地化文本，因此本工具会先通过正则表达式捕获`principle_(?P<name>[\w\-]+?)_(?P<value>\d+)`，然后寻找
 `principle_group_<name>`的本地化文本，这可能无法处理某些命名。
+10. 本程序可能无法处理本地化中的`replace`文件夹。

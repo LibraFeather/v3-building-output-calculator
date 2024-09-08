@@ -6,7 +6,7 @@
 import os
 import json
 
-import config.config as cc
+from utils import config as cc
 
 REPLACE_PATH_STR = "replace_paths"
 GAME_CUSTOM_DATA_STR = "game_custom_data"
@@ -58,27 +58,39 @@ def get_file_paths_list(folder_path: str):
 
 
 def get_localization_paths() -> list:
-    def add_path_to_list(path: str, paths_list: list):
-        for root, _, files in os.walk(path):
-            for file in files:
-                paths_list.append(os.path.join(root, file))
-
-    localization_paths_list = []
-    mod_localization_path = os.path.join(cc.MOD_PATH, "localization\\replace")
-    if os.path.exists(mod_localization_path):
-        mod_localization_path = os.path.join(mod_localization_path, cc.LOCALIZATION_PATH)
-        add_path_to_list(mod_localization_path, localization_paths_list)
-        return localization_paths_list
-    mod_localization_path = os.path.join(cc.MOD_PATH, f"localization\\{cc.LOCALIZATION_PATH}\\replace")
-    if os.path.exists(mod_localization_path):
-        add_path_to_list(mod_localization_path, localization_paths_list)
-        return localization_paths_list
-    file_paths = {}
-    mod_localization_path = os.path.join(cc.MOD_PATH, f"localization\\{cc.LOCALIZATION_PATH}")
+    # def add_path_to_list(path: str, paths_list: list):
+    #     for root, _, files in os.walk(path):
+    #         for file in files:
+    #             paths_list.append(os.path.join(root, file))
+    #
+    # localization_paths_list = []
     vanilla_localization_path = os.path.join(cc.VANILLA_PATH, f"localization\\{cc.LOCALIZATION_PATH}")
+    # mod_localization_path = os.path.join(cc.MOD_PATH, "localization\\replace")
+    # if os.path.exists(mod_localization_path):
+    #     mod_localization_path = os.path.join(mod_localization_path, cc.LOCALIZATION_PATH)
+    #     add_path_to_list(mod_localization_path, localization_paths_list)
+    #     add_path_to_list(vanilla_localization_path, localization_paths_list)
+    #     return localization_paths_list
+    # mod_localization_path = os.path.join(cc.MOD_PATH, f"localization\\{cc.LOCALIZATION_PATH}\\replace")
+    # if os.path.exists(mod_localization_path):
+    #     add_path_to_list(mod_localization_path, localization_paths_list)
+    #     add_path_to_list(vanilla_localization_path, localization_paths_list)
+    #     return localization_paths_list
+
+    file_paths = {}
+    localization_paths = []
+
+    mod_localization_path = os.path.join(cc.MOD_PATH, "localization")  # 补上那些直接在localization文件夹中的文件
+    if os.path.exists(mod_localization_path):
+        entries = os.listdir(mod_localization_path)
+        localization_paths = [os.path.join(mod_localization_path, entry)
+                              for entry in entries
+                              if entry.endswith(f"l_{cc.LOCALIZATION_PATH}.yml")]
+
+    mod_localization_path = os.path.join(cc.MOD_PATH, f"localization\\{cc.LOCALIZATION_PATH}")
     update_paths_dict(vanilla_localization_path, file_paths)
 
     if os.path.exists(mod_localization_path):  # 检查input文件夹内是否有相同文件并替换
         update_paths_dict(mod_localization_path, file_paths)
 
-    return list(file_paths.values())
+    return list(file_paths.values()) + localization_paths

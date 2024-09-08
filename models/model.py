@@ -52,6 +52,7 @@ class NormalNode(Name):
 # 建筑应用此类节点
 @dataclass
 class BuildingNode(NormalNode):
-    building_cost: int | float
     building_group: BuildingGroupNode
     building_group_display: BuildingGroupNode
+    unlocking_technologies: list
+    required_construction: int | float

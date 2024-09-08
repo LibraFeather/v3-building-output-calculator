@@ -5,12 +5,12 @@
 # ------------------------------------------------------------------------------------------
 import re
 import utils.pathproc as pp
+import utils.error as error
 
 # 正则表达式
-NAME_PATTERN = re.compile(r"[\w\-.]+")
 OPERATOR_PATTERN = re.compile(r"(<|<=|=|>=|>)")
-LOCALIZATION_PATTERN = r"^\s+[\w\-.]+:.+"
-LOCALIZATION_REPLACE_PATTERN = r"\$([\w\-.]+)\$"
+LOCALIZATION_PATTERN = re.compile(r"^\s+[\w\-.]+:.+", re.MULTILINE)
+LOCALIZATION_REPLACE_PATTERN = re.compile(r"\$([\w\-.]+)\$")
 
 GOOD_MODIFIER_PATTERN = re.compile(r"\bgoods_(?P<io_type>input|output)_(?P<key_word>[\w\-]+?)_(?P<am_type>add|mult)\b")
 BUILDING_EMPLOYMENT_MODIFIER_PATTERN = re.compile(
@@ -22,82 +22,66 @@ LIST_LOGIC_KEYS = ["if", "else_if", "else", "add", "multiply", "divide"]
 
 
 # ------------------------------------------------------------------------------------------
-# TODO 以下为旧的文本提取函数，现仅用于本地化，待重构
-def extract_bracket_content(text: str, start: int, char: str) -> tuple:
-    """
-    提取给定字符之间的内容
-    :param text: 待检索文本
-    :param start: 字符开始位置
-    :param char: 待匹配字符
-    :return: 字符之间的字符串（包括两端）
-    """
-    if char in ["{", "[", "("]:
-        open_bracket = char
-        close_bracket = {"{": "}", "[": "]", "(": ")"}[char]
-        stack = []
-        first_open_bracket_pos = -1  # 用于保存第一个open_bracket的位置
-        for i in range(start, len(text)):
-            if text[i] == open_bracket:
-                if first_open_bracket_pos == -1:
-                    first_open_bracket_pos = i
-                stack.append(i)
-            elif text[i] == close_bracket:
-                stack.pop()
-                if not stack:
-                    return text[start:first_open_bracket_pos - 1], text[first_open_bracket_pos + 1:i]  # 不包括两端的括号
-    elif char in ["\"", "\'"]:
-        first_quote_pos = text.find(char, start)  # 捕获第一个引号的位置
-        if first_quote_pos != -1:
-            end = text.find(char, first_quote_pos + 1)
-            if end != -1:
-                return text[start:first_quote_pos - 1], text[first_quote_pos + 1:end]
-
-
-def extract_all_blocks(pattern: str, text: str, char: str) -> dict:
-    """
-    提取<str> = {<content>}格式的代码块
-    对于{、[或(，会匹配第一个匹配的}、]或)，"或'则只会匹配下一个"或'
-    以<str>：<content>的字典形式返回
-    :param pattern: 代码块开头<str> = {的格式
-    :param text: 待检索的文本
-    :param char: 待配对的字符类型，只能是{、[、(、"或‘
-    :return: <str>：<content>格式的字典
-    """
-    dict_block = {}
-    for match in re.finditer(pattern, text, re.MULTILINE):
-        name, block = extract_bracket_content(text, match.start(), char)
-        name = NAME_PATTERN.search(name).group(0) if NAME_PATTERN.search(name) else "None"
-        if block:
-            if name in dict_block.keys():
-                pass
-            else:
-                dict_block[name] = block
-    return dict_block
+def read_file_with_encoding(file_path: str) -> str:
+    encodings = ["utf-8-sig", "gb2312"]
+    for encoding in encodings:
+        try:
+            with open(file_path, "r", encoding=encoding) as file:
+                return file.read()
+        except UnicodeDecodeError:
+            continue  # 如果解码失败，继续尝试下一种编码
+    raise ValueError(f"错误：{file_path}解码失败")
 
 
 # ------------------------------------------------------------------------------------------
 # 以下函数专门处理本地化
-def localization_combiner() -> str:
-    text = ""
-    localization_paths_list = pp.get_localization_paths()
-    for localization_path in localization_paths_list:
-        with open(localization_path, "r", encoding="utf-8-sig") as file:
-            text += file.read() + "\n"
-    return text
+def extract_localization_content(text: str, start: int) -> tuple:
+    len_text = len(text)
+    first_non_space_pos = start
+    for i in range(start, len_text):
+        if text[i].strip():
+            first_non_space_pos = i
+            break
+    first_colon_pos = text.find(":", start)
+    if first_colon_pos == -1:
+        return text[start:len_text + 1], ""
+    name = text[first_non_space_pos:first_colon_pos].strip()
+
+    first_quote_pos = text.find("\"", start)  # 捕获第一个引号的位置
+    if first_quote_pos != -1:
+        end = text.find("\"", first_quote_pos + 1)
+        if end != -1:
+            return name, text[first_quote_pos + 1:end]  # 不包含引号
+        else:
+            return name, text[first_quote_pos + 1:len_text]
 
 
-def extract_localization_blocks(text: str) -> dict:
-    return extract_all_blocks(LOCALIZATION_PATTERN, text, "\"")
+def extract_localization_blocks(text: str, localization_dict=None) -> dict:
+    if localization_dict is None:
+        localization_dict = {}
+    for match in LOCALIZATION_PATTERN.finditer(text):
+        name, block = extract_localization_content(text, match.start())
+        if block:
+            if name in localization_dict.keys():
+                pass
+            else:
+                localization_dict[name] = block
+    return localization_dict
 
 
 def get_localization_dict() -> dict:
-    text = localization_combiner()
-    return extract_localization_blocks(text)
+    localization_dict = {}
+    localization_paths_list = pp.get_localization_paths()
+    for localization_path in localization_paths_list:
+        with open(localization_path, "r", encoding="utf-8-sig") as file:
+            text = file.read()
+        extract_localization_blocks(text, localization_dict)
+    return localization_dict
 
 
 def calibrate_localization_dict(localization_dict_used: dict, localization_dict_all: dict):
     for key, value in localization_dict_used.items():
-        replace_list = re.findall(LOCALIZATION_REPLACE_PATTERN, value)
+        replace_list = LOCALIZATION_REPLACE_PATTERN.findall(value)
         if replace_list:
             for replace in replace_list:
                 if replace in localization_dict_all.keys():
@@ -136,11 +120,12 @@ def convert_to_number(value: str) -> int | float | str:
         return value
 
 
-def parse_text_block(start: int, text: str) -> tuple:
+def parse_text_block(start: int, text: str, file_path: str) -> tuple:
     """
     解析文本的一个block，返回block名称、内容和新的起始位置
     :param text: 待处理文本
     :param start: 开始位置
+    :param file_path: 文件路径
     :return: block名称、内容和新的起始位置
     """
 
@@ -157,8 +142,11 @@ def parse_text_block(start: int, text: str) -> tuple:
             elif text[k] == "}":
                 stack.pop()
                 if not stack:
-                    return text[_start + 1:k], k + 1  # 不包括两端的括号
-        print(f"文件出现花括号不匹配")
+                    return " " + text[_start + 1:k], k + 1  # 不包括两端的括号
+        if file_path is not None:
+            print(f"错误：{file_path}出现花括号不匹配")
+        else:
+            print(f"错误：文件出现花括号不匹配")
         return text[_start + 1:], len_text + 1  # 如果花括号不匹配，输出后面全部的文件
 
     def parse_quotation_mark_content(_start: int) -> tuple:
@@ -166,7 +154,7 @@ def parse_text_block(start: int, text: str) -> tuple:
             if text[k] == "\"":
                 return text[_start:k + 1], k + 1  # 包括两端的引号
             elif text[k] == "\n":
-                print("引号包裹的内容疑似出现跨行，可能导致异常")
+                print("提醒：引号包裹的内容疑似出现跨行，可能导致异常")
                 return text[_start:k], k + 1  # 假定引号内容不会换行
 
     operator, operator_start, operator_end = find_first_operator(text, start)
@@ -199,7 +187,7 @@ def parse_text_block(start: int, text: str) -> tuple:
     return name, first_non_space.group(), second_non_space_start
 
 
-def convert_text_into_dict(text: str, blocks_dict=None, logic_keys_dict=None, override=True) -> dict:
+def convert_text_into_dict(text: str, blocks_dict=None, logic_keys_dict=None, override=True, file_path=None) -> dict:
     if blocks_dict is None:
         blocks_dict = {}
     if logic_keys_dict is None:
@@ -207,7 +195,7 @@ def convert_text_into_dict(text: str, blocks_dict=None, logic_keys_dict=None, ov
     text = re.sub(r"#.*$", "", text, flags=re.MULTILINE)
     start = 0
     while start < len(text):
-        key, value, start = parse_text_block(start, text)
+        key, value, start = parse_text_block(start, text, file_path)
         if not key:
             continue
         value = convert_to_number(value)
@@ -220,7 +208,7 @@ def convert_text_into_dict(text: str, blocks_dict=None, logic_keys_dict=None, ov
             blocks_dict[key] = value
             continue
         if override:
-            print(f"{key}重复出现，新值将会覆盖旧值")
+            print(f"提醒：{key}重复出现，新值将会覆盖旧值")
             blocks_dict[key] = value
             continue
         if isinstance(blocks_dict[key], list):
@@ -242,9 +230,8 @@ def convert_text_into_dict_from_path(path: str, override=True) -> dict:
     logic_keys_dict = {logic_key: -1 for logic_key in LIST_LOGIC_KEYS}
     for file_path in list_file_paths:  # 对文件分别进行处理，以防止格式错误造成污染
         if not file_path.endswith(".info"):  # 忽略info文件，这个文件的作用类似注释
-            with open(file_path, "r", encoding="utf-8-sig") as file:
-                text = file.read()
-            blocks_dict = convert_text_into_dict(text, blocks_dict, logic_keys_dict, override)
+            text = read_file_with_encoding(file_path)
+            blocks_dict = convert_text_into_dict(text, blocks_dict, logic_keys_dict, override, file_path)
     return blocks_dict
 
 
@@ -259,6 +246,8 @@ def divide_dict_value(blocks_dict: dict) -> dict:
         """
         处理字符串内容，递归解析或分割为列表
         """
+        if not content.strip():  # 内容为空时，返回一个空字典
+            return {}
         if content[0] in ["\"", "@"]:
             return content
         if any(op in content for op in ("<", "=", ">")):  # 这里通过这三个符号判断是否能够进一步解析
@@ -297,7 +286,7 @@ def get_nested_dict_from_text(text: str, override=True) -> dict:
 # ------------------------------------------------------------------------------------------
 # 以下函数用于解析modifier
 def wrong_format(modifier_name: str):
-    print(f"{modifier_name}存在格式错误")
+    error.can_not_parse(modifier_name)
 
 
 def parse_good_modifier(modifier: str) -> dict | None:
@@ -352,7 +341,7 @@ def parse_modifier_dict(modifier_dict: dict) -> dict:
         if modifier_info is None:
             continue
         if not isinstance(value, (int, float)):
-            print(f"{modifier}的值{value}不是数值，因此被忽略")
+            error.wrong_type(modifier, "数值")
             continue
         modifier_info["value"] = value
         modifier_info_dict[modifier] = modifier_info
@@ -373,5 +362,6 @@ def get_era_num(tech: str, era: str) -> int:
     if num_match:
         return int(num_match.group())
     else:
-        print(f"无法解析{tech}的{era}，因此假定为0")
-        return 0
+        era_num = 0
+        error.can_not_parse(f"{tech}.{era}", era_num)
+        return era_num

@@ -3,13 +3,13 @@ from collections import Counter
 
 import utils.textproc as tp
 import utils.path_to_dict as ptd
-
-# TODO 按照类型排列
+import utils.error as error
+from utils.config import GOODS_COST_OFFSET
 import constants.str as s
 import models.model as mm
-from config.config import GOODS_COST_OFFSET
 
-NULL_BUILDING_GROUP = mm.BuildingGroupNode(
+
+NULL_BUILDING_GROUP = mm.BuildingGroupNode(  # 用于处理缺失建筑组的建筑
     localization_key="Null",
     localization_value="Null",
     parent_group=[]
@@ -58,14 +58,20 @@ class BuildingInfoTree:
                 parent_group = ""
             building_groups_dict[building_group] = parent_group
 
-        new_building_groups_dict = {}
-        for building_group in building_groups_blocks_dict:
-            new_building_groups_dict[building_group] = mm.BuildingGroupNode(
+        extend_building_groups_dict = building_groups_dict.copy()
+        for parent_group in building_groups_dict.values():  # 把不存在的父建筑组加上
+            if parent_group not in extend_building_groups_dict and parent_group:
+                error.lack_definition(parent_group)
+                extend_building_groups_dict[parent_group] = ""
+
+        building_group_info_dict = {}
+        for building_group in extend_building_groups_dict:
+            building_group_info_dict[building_group] = mm.BuildingGroupNode(
                 localization_key=building_group,
-                localization_value=self.localization_info[building_group],
-                parent_group=get_parent_groups_list(building_group, building_groups_dict)
+                localization_value=self.localization_info.get(building_group, building_group),
+                parent_group=get_parent_groups_list(building_group, extend_building_groups_dict)
             )
-        return new_building_groups_dict
+        return building_group_info_dict
 
     @staticmethod
     def __get_technologies_info(technology_blocks_dict) -> dict:
@@ -75,8 +81,8 @@ class BuildingInfoTree:
                 era = technology_blocks_dict[technology][s.ERA]
                 technologies_dict[technology] = tp.get_era_num(technology, era)
             else:
-                print(f"{technology}不存在{s.ERA}，因此假定为0")
                 technologies_dict[technology] = 0
+                error.lack_attribute(technology, s.ERA, technologies_dict[technology])
         return technologies_dict
 
     # ! 预备部分，创建各项存储字典
@@ -90,7 +96,7 @@ class BuildingInfoTree:
                 cost = good_blocks_dict[good][s.COST] * GOODS_COST_OFFSET.get(good, 1.0)
             else:
                 cost = 0
-                print(f"未找到{good}的{s.COST}，因此假定其为0")
+                error.lack_attribute(good, s.COST, cost)
             goods_dict[good] = mm.GoodNode(
                 localization_key=good,
                 localization_value=self.localization_info[good],
@@ -105,7 +111,7 @@ class BuildingInfoTree:
                 wage_weight = pop_blocks_dict[pop_type][s.WAGE_WEIGHT]
             else:
                 wage_weight = 0
-                print(f"未找到{pop_type}的{s.WAGE_WEIGHT}，因此假定其为0")
+                error.lack_attribute(pop_type, s.WAGE_WEIGHT, wage_weight)
             if s.SUBSISTENCE_INCOME in pop_blocks_dict[pop_type]:
                 subsistence_income = True
             else:
@@ -125,18 +131,19 @@ class BuildingInfoTree:
 
         # TODO 这里看起来需要重构
         def building_cost_converter(building_cost_str):
+            _building_cost = 0
             if isinstance(building_cost_str, str):
                 if building_cost_str not in self.scrit_values_info:
-                    print(f"{building_cost_str}无定义，假定为0")
-                    return 0
+                    error.lack_definition(building_cost_str, _building_cost)
+                    return _building_cost
                 if not isinstance(self.scrit_values_info[building_cost_str], (int, float)):
-                    print(f"{building_cost_str}的值{self.scrit_values_info[building_cost_str]}不是数值，假定为0")
-                    return 0
+                    error.wrong_type(building_cost_str, "数值", _building_cost)
+                    return _building_cost
                 return self.scrit_values_info[building_cost_str]
             if isinstance(building_cost_str, (int, float)):
                 return building_cost_str
-            print(f"{building_cost_str}格式异常，假定为0")
-            return 0
+            error.wrong_type(building_cost_str, "异常", _building_cost)
+            return _building_cost
 
         buildings_dict = {}
         for building in building_blocks_dict:
@@ -150,13 +157,16 @@ class BuildingInfoTree:
                 pmgs_list = building_blocks_dict[building][s.PRODUCTION_METHOD_GROUPS]
             else:
                 pmgs_list = []
-                print(f"{building}格式异常，未找到任何生产方式组")
+                error.lack_attribute(building, "生产方式组")
             if s.BUILDING_GROUP in building_blocks_dict[building]:
                 building_group = building_blocks_dict[building][s.BUILDING_GROUP]
             else:
-                print(f"{building}格式异常，未找到建筑组，因此被忽略")
-                continue
-            buildings_dict[building] = {'cost': building_cost, 'pmgs': pmgs_list, "bg": building_group}
+                building_group = ""
+                error.lack_attribute(building, "建筑组")
+            buildings_dict[building] = {
+                "cost": building_cost, "pmgs": pmgs_list, "bg": building_group,
+                "unlocking_technologies": building_blocks_dict[building].get(s.UNLOCKING_TECHNOLOGIES, [])
+            }
         return buildings_dict
 
     @staticmethod
@@ -170,7 +180,7 @@ class BuildingInfoTree:
                 pms_list = pmg_blocks_dict[pmg][s.PRODUCTION_METHODS]
             else:
                 pms_list = []
-                print(f"{pmg}格式异常，未找到任何生产方式")
+                error.lack_attribute(pmg, "生产方式")
             pmgs_dict[pmg] = pms_list
         return pmgs_dict
 
@@ -184,7 +194,6 @@ class BuildingInfoTree:
                 "employment": {},
                 "subsistence_output": 0
             }
-
             pms_dict[pm][s.UNLOCKING_TECHNOLOGIES] = pm_blocks_dict[pm].get(s.UNLOCKING_TECHNOLOGIES, [])
             pms_dict[pm][s.UNLOCKING_PRODUCTION_METHODS] = pm_blocks_dict[pm].get(s.UNLOCKING_PRODUCTION_METHODS, [])
             pms_dict[pm][s.UNLOCKING_PRINCIPLES] = pm_blocks_dict[pm].get(s.UNLOCKING_PRINCIPLES, [])
@@ -194,7 +203,6 @@ class BuildingInfoTree:
             pms_dict[pm][s.UNLOCKING_IDENTITY] = [identity] if identity is not None else []
 
             if s.BUILDING_MODIFIERS not in pm_blocks_dict[pm]:
-                # print(f"{pm}中缺少{BUILDING_MODIFIERS_STR}")
                 continue
 
             # TODO 这一段对modifier的处理需要重构
@@ -208,18 +216,18 @@ class BuildingInfoTree:
             modifier_dict = tp.parse_modifier_dict(dict(modifier_dict))
             for modifier, modifier_info in modifier_dict.items():
                 if modifier_info["am_type"] != "add":  # 只允许add类modifier
-                    print(f"{pm}的{s.WORKFORCE_SCALED}或{s.LEVEL_SCALED}的{modifier}不是add类，因此被忽略")
+                    error.wrong_type(f"{pm}.{s.WORKFORCE_SCALED}/{s.LEVEL_SCALED}.{modifier}", "add")
                     continue
                 match modifier_info["category"]:
                     case "goods":
                         if modifier_info["key_word"] not in self.goods_info:
-                            print(f"未找到{pm}中{modifier_info["key_word"]}的定义")
+                            error.lack_definition(f"{pm}.{modifier_info["key_word"]}")
                             continue
                         pms_dict[pm]["add"][modifier_info["io_type"]][modifier_info["key_word"]] = modifier_info[
                             "value"]
                     case ("building", "employment"):
                         if modifier_info["key_word"] not in self.pop_types_info:
-                            print(f"未找到{pm}中{modifier_info["key_word"]}的定义")
+                            error.lack_definition(f"{pm}.{modifier_info["key_word"]}")
                             continue
                         pms_dict[pm]["employment"][modifier_info["key_word"]] = modifier_info["value"]
             if s.UNSCALED in pm_blocks_dict[pm][s.BUILDING_MODIFIERS]:
@@ -229,7 +237,7 @@ class BuildingInfoTree:
                     match modifier_info["category"]:
                         case "goods":
                             if modifier_info["key_word"] not in self.goods_info:
-                                print(f"未找到{pm}中{modifier_info["key_word"]}的定义")
+                                error.lack_definition(f"{pm}.{modifier_info["key_word"]}")
                                 continue
                             match modifier_info["am_type"]:
                                 case "add":
@@ -246,9 +254,9 @@ class BuildingInfoTree:
                             if modifier_info["am_type"] == "add":
                                 pms_dict[pm]["subsistence_output"] = modifier_info["value"]
                             else:
-                                print(f"{pm}的{s.UNSCALED}的{modifier}不应该为{modifier_info["am_type"]}")
+                                error.wrong_type(f"{pm}.{s.UNSCALED}.{modifier}", "add")
                         case _:
-                            print(f"{pm}的{s.UNSCALED}的{modifier}无法被解析")
+                            error.can_not_parse(f"{pm}.{s.UNSCALED}.{modifier}")
         return pms_dict
 
     @staticmethod
@@ -277,14 +285,14 @@ class BuildingInfoTree:
                 localization_dict_used[principle_key] = localization_dict_all[
                                                             principle_group_key] + principle_match.group("value")
             else:
-                print(f"找不到{principle_group_key}的本地化")
+                error.lack_localization(principle_group_key)
                 localization_dict_used[principle_key] = principle_key
 
         for key in localization_keys_used:
             if key in localization_dict_all:  # 一些键没有对应的值
                 localization_dict_used[key] = localization_dict_all[key]
             else:
-                print(f"找不到{key}的本地化")
+                error.lack_localization(key)
                 localization_dict_used[key] = key
 
         tp.calibrate_localization_dict(localization_dict_used, localization_dict_all)
@@ -292,7 +300,7 @@ class BuildingInfoTree:
         # dummy building的本地化值过长，需要被替换，这里用本地化值的长度作为依据
         for building in game_object_list_dict["buildings"]:
             if len(localization_dict_used[building]) > 50:
-                print(f"{building}的本地化值过长，被dummy代替")
+                print(f"提醒：{building}的本地化值过长，因此被dummy代替")  # 这个特殊的提醒还是保留在这里吧
                 localization_dict_used[building] = "dummy"
 
         return localization_dict_used
@@ -315,9 +323,10 @@ class BuildingInfoTree:
                 localization_key=building,
                 localization_value=self.localization_info[building],
                 children=self.parse_pmgs(building_info['pmgs']),
-                building_cost=building_info['cost'],
+                required_construction=building_info['cost'],
                 building_group=building_group,
-                building_group_display=building_group_display
+                building_group_display=building_group_display,
+                unlocking_technologies=self.parse_tech(self.buildings_info[building][s.UNLOCKING_TECHNOLOGIES])
             ))
 
         return buildings_list
@@ -330,7 +339,7 @@ class BuildingInfoTree:
             else:
                 return building_group_info, self.building_groups_info[building_group_info.parent_group[-1]]
         else:
-            print(f"{building_group}无定义")
+            error.lack_definition(building_group)
             return NULL_BUILDING_GROUP, NULL_BUILDING_GROUP
 
     def parse_pmgs(self, pmgs: list) -> list:
@@ -343,7 +352,7 @@ class BuildingInfoTree:
                     children=self.parse_pms(self.pmgs_info[pmg])
                 ))
             else:
-                print(f"{pmg}无定义")
+                error.lack_definition(pmg)
 
         return pmgs_list
 
@@ -367,7 +376,7 @@ class BuildingInfoTree:
                     subsistence_output=self.pms_info[pm]["subsistence_output"]
                 ))
             else:
-                print(f"{pm}无定义")
+                error.lack_definition(pm)
         return pms_list
 
     def parse_tech(self, techs) -> list:
@@ -380,7 +389,7 @@ class BuildingInfoTree:
                     era=self.technologies_info[tech],
                 ))
             else:
-                print(f"{tech}无定义")
+                error.lack_definition(tech)
         return techs_list
 
     def parse_name(self, objects: list, info: dict) -> list:
@@ -392,5 +401,5 @@ class BuildingInfoTree:
                     localization_value=self.localization_info[_object]
                 ))
             else:
-                print(f"{_object}无定义")
+                error.lack_definition(_object)
         return objects_list

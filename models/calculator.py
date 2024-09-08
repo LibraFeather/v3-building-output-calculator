@@ -32,6 +32,10 @@ class Calculator:
             "unlocking_identity": "核心理念支柱要求",
             "unlocking_principles": "原则要求"
         }
+        self.COLUMN_GOODS = {
+            good: f"{good_info.localization_value}_{good_info.localization_key}"
+            for good, good_info in self.goods_info.items()
+        }
         self.automation_pm_list = building_info_tree_complex.automation_pm_list
 
     # ------------------------------------------------------------------------------------------
@@ -51,12 +55,12 @@ class Calculator:
                         can_generate_data = False
                         break
             if can_generate_data:
-                one_line_data = self.__generate_one_line_data(combination, pmgs_list)
+                one_line_data = self.__generate_one_line_data(combination, pmgs_list, building)
                 one_line_data_finished = self.__calculate_data(one_line_data, building)
                 one_line_data_list.append(one_line_data_finished)
         return one_line_data_list
 
-    def __generate_one_line_data(self, combination: tuple, pmgs_list: list) -> dict:
+    def __generate_one_line_data(self, combination: tuple, pmgs_list: list, building) -> dict:
         def check_workforce_positive(workforce_dict: dict) -> dict:
             for _, v in workforce_dict.items():
                 if v < 0:
@@ -80,18 +84,22 @@ class Calculator:
         goods_input_mult = Counter()
         goods_output_mult = Counter()
         workforce = Counter()
-        one_line_data = {
-            "raw_data": {'goods_input': {}, 'goods_output': {}, 'workforce': {}, "subsistence_output": 0},
-            "pm_data": {},
-            "processed_data": {},
-            "other_data": {"era": 0, "highest_tech": "", "techs_all": "", "unlocking_principles": "",
-                           "unlocking_identity": "", "unlocking_laws": "", "disallowing_laws": ""},
-            "goods_data": {}
-        }
+        one_line_data = {"raw_data": {}, "pm_data": {}, "processed_data": {}, "other_data": {}, "goods_data": {}}
 
         # TODO 这里需要进一步简化代码
-        highest_tech = []
-        techs_all = []
+        if building.unlocking_technologies:
+            era = max(building.unlocking_technologies, key=lambda _tech: _tech.era).era
+            highest_tech = []
+            for tech in building.unlocking_technologies:
+                if tech.era == era and tech not in highest_tech:
+                    highest_tech.append(tech)
+        else:
+            era = 0
+            highest_tech = []
+
+        subsistence_output = 0
+
+        techs_all = building.unlocking_technologies
         unlocking_principles = []
         unlocking_identity = []
         unlocking_laws = []
@@ -102,13 +110,14 @@ class Calculator:
             goods_input_mult.update(combination[i].goods_mult["input"])
             goods_output_mult.update(combination[i].goods_mult["output"])
             workforce.update(combination[i].workforce)
-            one_line_data["raw_data"]["subsistence_output"] += combination[i].subsistence_output
+            subsistence_output += combination[i].subsistence_output
+
             one_line_data["pm_data"][pmgs_list[i]] = combination[i].localization_value
             for tech in combination[i].unlocking_technologies:
-                if tech.era > one_line_data["other_data"]["era"]:
-                    one_line_data["other_data"]["era"] = tech.era
+                if tech.era > era:
+                    era = tech.era
                     highest_tech = [tech]
-                if tech.era == one_line_data["other_data"]["era"] and tech not in highest_tech:
+                elif tech.era == era and tech not in highest_tech:
                     highest_tech.append(tech)
                 if tech not in techs_all:
                     techs_all.append(tech)
@@ -117,22 +126,29 @@ class Calculator:
             add_object_to_list(combination[i].unlocking_laws, unlocking_laws)
             add_object_to_list(combination[i].disallowing_laws, disallowing_laws)
 
-        one_line_data["raw_data"]['goods_input'] = calculate_good(dict(goods_input_add), dict(goods_input_mult))
-        one_line_data["raw_data"]['goods_output'] = calculate_good(dict(goods_output_add), dict(goods_output_mult))
-        one_line_data["raw_data"]['workforce'] = check_workforce_positive(dict(workforce))  # 将负值变为0
+        one_line_data["raw_data"] = {
+            "goods_input": calculate_good(dict(goods_input_add), dict(goods_input_mult)),
+            "goods_output": calculate_good(dict(goods_output_add), dict(goods_output_mult)),
+            "workforce": check_workforce_positive(dict(workforce)),  # 将负值变为0
+            "subsistence_output": subsistence_output
+        }
 
-        one_line_data["other_data"]["highest_tech"] = " ".join([tech.localization_value for tech in highest_tech])
-        one_line_data["other_data"]["techs_all"] = " ".join([tech.localization_value for tech in techs_all])
-        one_line_data["other_data"]["unlocking_principles"] = " ".join(
-            [principle.localization_value for principle in unlocking_principles])
-        one_line_data["other_data"]["unlocking_identity"] = " ".join(
-            [identity.localization_value for identity in unlocking_identity])
-        one_line_data["other_data"]["unlocking_laws"] = " ".join([law.localization_value for law in unlocking_laws])
-        one_line_data["other_data"]["disallowing_laws"] = " ".join([law.localization_value for law in disallowing_laws])
+        one_line_data["other_data"] = {
+            "era": era,
+            "highest_tech": " ".join([tech.localization_value for tech in highest_tech]),
+            "techs_all": " ".join([tech.localization_value for tech in techs_all]),
+            "unlocking_principles": " ".join([principle.localization_value for principle in unlocking_principles]),
+            "unlocking_identity": " ".join([identity.localization_value for identity in unlocking_identity]),
+            "unlocking_laws": " ".join([law.localization_value for law in unlocking_laws]),
+            "disallowing_laws": " ".join([law.localization_value for law in disallowing_laws])
+        }
 
-        for good, good_info in self.goods_info.items():
-            one_line_data["goods_data"][good_info.localization_value] = one_line_data["raw_data"]["goods_output"].get(
-                good, 0) - one_line_data["raw_data"]["goods_input"].get(good, 0)
+        one_line_data["goods_data"] = {
+            good_info.localization_key:
+                one_line_data["raw_data"]["goods_output"].get(good, 0)
+                - one_line_data["raw_data"]["goods_input"].get(good, 0)
+            for good, good_info in self.goods_info.items()
+        }
         return one_line_data
 
     def __calculate_data(self, one_line_data: dict, building) -> dict:
@@ -153,7 +169,7 @@ class Calculator:
             one_line_data["raw_data"]["subsistence_output"] * one_line_data["raw_data"]['workforce'][pop_type] *
             self.pop_type_info[pop_type].subsistence_income for pop_type in one_line_data["raw_data"]['workforce']) / 52
         per_capita_profit = profit / workforce_population * 52 if workforce_population else 'Null'
-        per_cc_profit = profit / building.building_cost if building.building_cost else 'Null'
+        per_cc_profit = profit / building.required_construction if building.required_construction else 'Null'
         rate_of_return = output_cost / input_cost if input_cost > 0 else 'Null'
         wage_weight = sum(
             one_line_data["raw_data"]['workforce'][pop_type] * self.pop_type_info[pop_type].wage_weight for pop_type in
@@ -179,7 +195,7 @@ class Calculator:
     def __transfer_dict_to_df(self, one_line_data_list, building):
         pmg_list = building.children
         column_pmg = {pmg.localization_key: pmg.localization_value for pmg in pmg_list}
-        colum_rename = column_pmg | self.COLUMN_HEADERS
+        colum_rename = column_pmg | self.COLUMN_HEADERS | self.COLUMN_GOODS
         rows = []
         for one_line_data in one_line_data_list:
             row = one_line_data["pm_data"] | one_line_data["processed_data"] | one_line_data["other_data"] | \
@@ -188,8 +204,8 @@ class Calculator:
         building_info_df = pd.DataFrame(rows)
 
         for good_info in self.goods_info.values():
-            if (building_info_df[good_info.localization_value] == 0).all():
-                building_info_df.drop(good_info.localization_value, axis=1, inplace=True)
+            if (building_info_df[good_info.localization_key] == 0).all():
+                building_info_df.drop(good_info.localization_key, axis=1, inplace=True)
         for key in list(self.COLUMN_HEADERS.keys())[9:]:
             if (building_info_df[key] == "").all():
                 building_info_df.drop(key, axis=1, inplace=True)
@@ -230,7 +246,7 @@ class Calculator:
                           "other_data"] | one_line_data["goods_data"]
                 rows.append(row)
         summary_table_df = pd.DataFrame(rows)
-        summary_table_df.rename(columns=self.COLUMN_HEADERS, inplace=True)
+        summary_table_df.rename(columns=self.COLUMN_HEADERS | self.COLUMN_GOODS, inplace=True)
         summary_table_df.to_excel(f"{OUTPUT_PATH}\\buildings\\00_总表.xlsx", index=False)
         print("总表.xlsx 输出成功")
 
