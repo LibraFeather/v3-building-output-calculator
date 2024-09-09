@@ -24,37 +24,46 @@ LIST_LOGIC_KEYS = ["if", "else_if", "else", "add", "multiply", "divide"]
 
 # ------------------------------------------------------------------------------------------
 # 以下函数专门处理本地化
-def extract_localization_content(text: str, start: int) -> tuple:
-    len_text = len(text)
-    first_non_space_pos = start
-    for i in range(start, len_text):
-        if text[i].strip():
-            first_non_space_pos = i
-            break
-    first_colon_pos = text.find(":", start)
-    if first_colon_pos == -1:
-        return text[start:len_text + 1], ""
-    name = text[first_non_space_pos:first_colon_pos].strip()
-
-    first_quote_pos = text.find("\"", start)  # 捕获第一个引号的位置
-    if first_quote_pos != -1:
-        end = text.find("\"", first_quote_pos + 1)
-        if end != -1:
-            return name, text[first_quote_pos + 1:end]  # 不包含引号
-        else:
-            return name, text[first_quote_pos + 1:len_text]
+def parse_yaml_line(line):
+    # 查找冒号位置，分割键和值
+    parts = line.split(":", 1)
+    if len(parts) == 2:
+        key = parts[0].strip()
+        value = parts[1].strip()
+        if value.startswith('"') and value.endswith('"'):
+            value = value[1:-1]
+        return key, value
+    return None, None
 
 
-def extract_localization_blocks(text: str, localization_dict=None) -> dict:
+def extract_localization_blocks(yaml_content: str, localization_dict=None) -> dict:
     if localization_dict is None:
         localization_dict = {}
-    for match in LOCALIZATION_PATTERN.finditer(text):
-        name, block = extract_localization_content(text, match.start())
-        if block:
-            if name in localization_dict.keys():
-                pass
-            else:
-                localization_dict[name] = block
+
+    lines = yaml_content.split("\n")
+
+    for line in lines:
+        new_line = []
+        in_single_quote = False
+        in_double_quote = False
+        for char in line:
+            if char == "'" and not in_double_quote:
+                in_single_quote = not in_single_quote
+            elif char == '"' and not in_single_quote:
+                in_double_quote = not in_double_quote
+            if not in_single_quote and not in_double_quote and char == "#":
+                break
+            new_line.append(char)
+
+        # 处理行的其余部分（如果存在）
+        new_line = "".join(new_line).rstrip()
+        if new_line:
+            name, block = parse_yaml_line(new_line)
+            if block:
+                if name in localization_dict.keys():
+                    pass
+                else:
+                    localization_dict[name] = block
     return localization_dict
 
 
@@ -62,8 +71,7 @@ def get_localization_dict() -> dict:
     localization_dict = {}
     localization_paths_list = pp.get_localization_paths()
     for localization_path in localization_paths_list:
-        with open(localization_path, "r", encoding="utf-8-sig") as file:
-            text = file.read()
+        text = rf.read_file_with_encoding(localization_path)
         extract_localization_blocks(text, localization_dict)
     return localization_dict
 
@@ -140,7 +148,7 @@ def parse_text_block(start: int, text: str, file_path: str) -> tuple:
 
     def parse_quotation_mark_content(_start: int) -> tuple:
         for k in range(_start + 1, len_text):  # 跳过第一个引号，只需要知道第二个引号的位置
-            if text[k] == "\"":
+            if text[k] == '"':
                 return text[_start:k + 1], k + 1  # 包括两端的引号
             elif text[k] == "\n":
                 print("提醒：引号包裹的内容疑似出现跨行，可能导致异常")
@@ -220,7 +228,7 @@ def convert_text_into_dict_from_path(path: str, override=True) -> dict:
     for file_path in list_file_paths:  # 对文件分别进行处理，以防止格式错误造成污染
         if not file_path.endswith(".info"):  # 忽略info文件，这个文件的作用类似注释
             text = rf.read_file_with_encoding(file_path)
-            blocks_dict = convert_text_into_dict(text, blocks_dict, logic_keys_dict, override, file_path)
+            convert_text_into_dict(text, blocks_dict, logic_keys_dict, override, file_path)
     return blocks_dict
 
 

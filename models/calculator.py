@@ -99,7 +99,7 @@ class Calculator:
 
         subsistence_output = 0
 
-        techs_all = building.unlocking_technologies
+        techs_all = building.unlocking_technologies.copy()
         unlocking_principles = []
         unlocking_identity = []
         unlocking_laws = []
