@@ -8,10 +8,10 @@ import json
 
 import utils.config as c
 
-REPLACE_PATH_STR = "replace_paths"
-GAME_CUSTOM_DATA_STR = "game_custom_data"
+REPLACE_PATH_STR = 'replace_paths'
+GAME_CUSTOM_DATA_STR = 'game_custom_data'
 
-METADATA_PATH = ".metadata\\metadata.json"
+METADATA_PATH = '.metadata\\metadata.json'
 
 replace_paths_list = []
 
@@ -20,12 +20,11 @@ def update_replace_paths_list():
     global replace_paths_list  # 这里需要对其赋值，因此必须使用global
     metadata_path = os.path.join(c.MOD_PATH, METADATA_PATH)
     if os.path.exists(metadata_path):
-        with open(metadata_path, "r", encoding="utf-8-sig") as file:
+        with open(metadata_path, 'r', encoding='utf-8-sig') as file:
             config_dict = json.load(file)
         if GAME_CUSTOM_DATA_STR in config_dict:
             if REPLACE_PATH_STR in config_dict[GAME_CUSTOM_DATA_STR]:
                 replace_paths_list = config_dict[GAME_CUSTOM_DATA_STR][REPLACE_PATH_STR]
-                replace_paths_list = [path.replace("/", "\\") for path in replace_paths_list]
 
 
 update_replace_paths_list()  # 更新被替代的路径

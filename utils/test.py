@@ -13,7 +13,7 @@ def get_input_test_content() -> str:
     """
     将input_test.txt变为字符串，仅用于测试程序运行
     """
-    with open("input_test.txt", "r", encoding="utf-8-sig") as file:
+    with open('input_test.txt', 'r', encoding='utf-8-sig') as file:
         test_content = file.read()
     return test_content
 
@@ -22,7 +22,7 @@ def output_to_test_json(test_var):
     """
     将字符串变为output_test.json，仅用于测试程序运行
     """
-    with open("test.json", "w", encoding="utf-8-sig") as json_file:
+    with open('test.json', 'w', encoding='utf-8-sig') as json_file:
         json.dump(test_var, json_file, indent=4, ensure_ascii=False)
 
 
@@ -30,7 +30,7 @@ def output_to_test_txt(test_var):
     """
     将字符串变为output_test.txt，仅用于测试程序运行
     """
-    with open("test.txt", "w", encoding="utf-8-sig") as text_file:
+    with open('test.txt', 'w', encoding='utf-8-sig') as text_file:
         text_file.write(test_var)
 
 
@@ -39,12 +39,12 @@ def txt_combiner_from_one_folder(path: str) -> str:
     """
     组合给定文件夹下的所有非.info文件，然后将他们以字符串类型输出
     """
-    content = ""
+    content = ''
     for root, dirs, files in os.walk(path):
         for file in files:
             file_path = os.path.join(root, file)
-            with open(file_path, "r", encoding="utf-8-sig") as _file:
-                content += _file.read() + "\n"
+            with open(file_path, 'r', encoding='utf-8-sig') as _file:
+                content += _file.read() + '\n'
     return content
 
 

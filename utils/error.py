@@ -13,7 +13,7 @@ def lack_localization(object_name: str):
 
 
 def wrong_type(object_name: str, object_type, value=None):
-    if object_type == "异常":
+    if object_type == '异常':
         error_info = f"错误：{object_name}格式异常"
     else:
         error_info = f"错误：{object_name}的类型不是{object_type}"

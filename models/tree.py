@@ -10,32 +10,32 @@ import models.model as mm
 
 
 NULL_BUILDING_GROUP = mm.BuildingGroupNode(  # 用于处理缺失建筑组的建筑
-    localization_key="Null",
-    localization_value="Null",
+    localization_key='Null',
+    localization_value='Null',
     parent_group=[]
 )
 
 
 class BuildingInfoTree:
     def __init__(self):
-        game_objet_need = ["buildings", "building_groups", "goods", "laws", "pop_types", "power_bloc_identities",
-                           "power_bloc_principles",
-                           "production_method_groups", "production_methods", "script_values", "technologies"]
+        game_objet_need = ['buildings', 'building_groups', 'goods', 'laws', 'pop_types', 'power_bloc_identities',
+                           'power_bloc_principles',
+                           'production_method_groups', 'production_methods', 'script_values', 'technologies']
         game_object_dict = ptd.get_game_object_dict(game_objet_need)
 
         self.localization_info = self.__get_localization_info(game_object_dict)
 
-        self.scrit_values_info = game_object_dict["script_values"]
-        self.building_groups_info = self.__get_building_groups_info(game_object_dict["building_groups"])
-        self.buildings_info = self.__get_buildings_info(game_object_dict["buildings"])
-        self.goods_info = self.__get_goods_info(game_object_dict["goods"])
-        self.laws_info = game_object_dict["laws"]
-        self.pop_types_info = self.__get_pops_info(game_object_dict["pop_types"])
-        self.identities_info = game_object_dict["power_bloc_identities"]
-        self.principles_info = game_object_dict["power_bloc_principles"]
-        self.pmgs_info = self.__get_pmgs_info(game_object_dict["production_method_groups"])
-        self.pms_info = self.__get_pms_info(game_object_dict["production_methods"])
-        self.technologies_info = self.__get_technologies_info(game_object_dict["technologies"])
+        self.scrit_values_info = game_object_dict['script_values']
+        self.building_groups_info = self.__get_building_groups_info(game_object_dict['building_groups'])
+        self.buildings_info = self.__get_buildings_info(game_object_dict['buildings'])
+        self.goods_info = self.__get_goods_info(game_object_dict['goods'])
+        self.laws_info = game_object_dict['laws']
+        self.pop_types_info = self.__get_pops_info(game_object_dict['pop_types'])
+        self.identities_info = game_object_dict['power_bloc_identities']
+        self.principles_info = game_object_dict['power_bloc_principles']
+        self.pmgs_info = self.__get_pmgs_info(game_object_dict['production_method_groups'])
+        self.pms_info = self.__get_pms_info(game_object_dict['production_methods'])
+        self.technologies_info = self.__get_technologies_info(game_object_dict['technologies'])
 
         self.automation_pm_list = self.__get_automation_pm_list()
 
@@ -55,14 +55,14 @@ class BuildingInfoTree:
             if s.PARENT_GROUP in building_groups_blocks_dict[building_group]:
                 parent_group = building_groups_blocks_dict[building_group][s.PARENT_GROUP]
             else:
-                parent_group = ""
+                parent_group = ''
             building_groups_dict[building_group] = parent_group
 
         extend_building_groups_dict = building_groups_dict.copy()
         for parent_group in building_groups_dict.values():  # 把不存在的父建筑组加上
             if parent_group not in extend_building_groups_dict and parent_group:
                 error.lack_definition(parent_group)
-                extend_building_groups_dict[parent_group] = ""
+                extend_building_groups_dict[parent_group] = ''
 
         building_group_info_dict = {}
         for building_group in extend_building_groups_dict:
@@ -137,12 +137,12 @@ class BuildingInfoTree:
                     error.lack_definition(building_cost_str, _building_cost)
                     return _building_cost
                 if not isinstance(self.scrit_values_info[building_cost_str], (int, float)):
-                    error.wrong_type(building_cost_str, "数值", _building_cost)
+                    error.wrong_type(building_cost_str, '数值', _building_cost)
                     return _building_cost
                 return self.scrit_values_info[building_cost_str]
             if isinstance(building_cost_str, (int, float)):
                 return building_cost_str
-            error.wrong_type(building_cost_str, "异常", _building_cost)
+            error.wrong_type(building_cost_str, '异常', _building_cost)
             return _building_cost
 
         buildings_dict = {}
@@ -157,15 +157,15 @@ class BuildingInfoTree:
                 pmgs_list = building_blocks_dict[building][s.PRODUCTION_METHOD_GROUPS]
             else:
                 pmgs_list = []
-                error.lack_attribute(building, "生产方式组")
+                error.lack_attribute(building, '生产方式组')
             if s.BUILDING_GROUP in building_blocks_dict[building]:
                 building_group = building_blocks_dict[building][s.BUILDING_GROUP]
             else:
-                building_group = ""
-                error.lack_attribute(building, "建筑组")
+                building_group = ''
+                error.lack_attribute(building, '建筑组')
             buildings_dict[building] = {
-                "cost": building_cost, "pmgs": pmgs_list, "bg": building_group,
-                "unlocking_technologies": building_blocks_dict[building].get(s.UNLOCKING_TECHNOLOGIES, [])
+                'cost': building_cost, 'pmgs': pmgs_list, 'bg': building_group,
+                'unlocking_technologies': building_blocks_dict[building].get(s.UNLOCKING_TECHNOLOGIES, [])
             }
         return buildings_dict
 
@@ -180,7 +180,7 @@ class BuildingInfoTree:
                 pms_list = pmg_blocks_dict[pmg][s.PRODUCTION_METHODS]
             else:
                 pms_list = []
-                error.lack_attribute(pmg, "生产方式")
+                error.lack_attribute(pmg, '生产方式')
             pmgs_dict[pmg] = pms_list
         return pmgs_dict
 
@@ -189,10 +189,10 @@ class BuildingInfoTree:
         for pm in pm_blocks_dict:
 
             pms_dict[pm] = {
-                "add": {"input": {}, "output": {}},
-                "mult": {"input": {}, "output": {}},
-                "employment": {},
-                "subsistence_output": 0
+                'add': {'input': {}, 'output': {}},
+                'mult': {'input': {}, 'output': {}},
+                'employment': {},
+                'subsistence_output': 0
             }
             pms_dict[pm][s.UNLOCKING_TECHNOLOGIES] = pm_blocks_dict[pm].get(s.UNLOCKING_TECHNOLOGIES, [])
             pms_dict[pm][s.UNLOCKING_PRODUCTION_METHODS] = pm_blocks_dict[pm].get(s.UNLOCKING_PRODUCTION_METHODS, [])
@@ -215,46 +215,46 @@ class BuildingInfoTree:
                     tp.calibrate_modifier_dict(dict(pm_blocks_dict[pm][s.BUILDING_MODIFIERS][s.LEVEL_SCALED])))
             modifier_dict = tp.parse_modifier_dict(dict(modifier_dict))
             for modifier, modifier_info in modifier_dict.items():
-                if modifier_info["am_type"] != "add":  # 只允许add类modifier
-                    error.wrong_type(f"{pm}.{s.WORKFORCE_SCALED}/{s.LEVEL_SCALED}.{modifier}", "add")
+                if modifier_info['am_type'] != 'add':  # 只允许add类modifier
+                    error.wrong_type(f"{pm}.{s.WORKFORCE_SCALED}/{s.LEVEL_SCALED}.{modifier}", 'add')
                     continue
-                match modifier_info["category"]:
-                    case "goods":
-                        if modifier_info["key_word"] not in self.goods_info:
-                            error.lack_definition(f"{pm}.{modifier_info["key_word"]}")
+                match modifier_info['category']:
+                    case 'goods':
+                        if modifier_info['key_word'] not in self.goods_info:
+                            error.lack_definition(f"{pm}.{modifier_info['key_word']}")
                             continue
-                        pms_dict[pm]["add"][modifier_info["io_type"]][modifier_info["key_word"]] = modifier_info[
-                            "value"]
-                    case ("building", "employment"):
-                        if modifier_info["key_word"] not in self.pop_types_info:
-                            error.lack_definition(f"{pm}.{modifier_info["key_word"]}")
+                        pms_dict[pm]['add'][modifier_info['io_type']][modifier_info['key_word']] = modifier_info[
+                            'value']
+                    case ('building', 'employment'):
+                        if modifier_info['key_word'] not in self.pop_types_info:
+                            error.lack_definition(f"{pm}.{modifier_info['key_word']}")
                             continue
-                        pms_dict[pm]["employment"][modifier_info["key_word"]] = modifier_info["value"]
+                        pms_dict[pm]['employment'][modifier_info['key_word']] = modifier_info['value']
             if s.UNSCALED in pm_blocks_dict[pm][s.BUILDING_MODIFIERS]:
                 modifier_dict = tp.parse_modifier_dict(
                     tp.calibrate_modifier_dict(dict(pm_blocks_dict[pm][s.BUILDING_MODIFIERS][s.UNSCALED])))
                 for modifier, modifier_info in modifier_dict.items():
-                    match modifier_info["category"]:
-                        case "goods":
-                            if modifier_info["key_word"] not in self.goods_info:
-                                error.lack_definition(f"{pm}.{modifier_info["key_word"]}")
+                    match modifier_info['category']:
+                        case 'goods':
+                            if modifier_info['key_word'] not in self.goods_info:
+                                error.lack_definition(f"{pm}.{modifier_info['key_word']}")
                                 continue
-                            match modifier_info["am_type"]:
-                                case "add":
-                                    if modifier_info["key_word"] in pms_dict[pm]["add"][modifier_info["io_type"]]:
-                                        pms_dict[pm]["add"][modifier_info["io_type"]][modifier_info["key_word"]] \
-                                            += modifier_info["value"]
+                            match modifier_info['am_type']:
+                                case 'add':
+                                    if modifier_info['key_word'] in pms_dict[pm]['add'][modifier_info['io_type']]:
+                                        pms_dict[pm]['add'][modifier_info['io_type']][modifier_info['key_word']] \
+                                            += modifier_info['value']
                                     else:
-                                        pms_dict[pm]["add"][modifier_info["io_type"]][modifier_info["key_word"]] \
-                                            = modifier_info["value"]
-                                case "mult":
-                                    pms_dict[pm]["mult"][modifier_info["io_type"]][modifier_info["key_word"]] \
-                                        = modifier_info["value"]
-                        case ("building", "subsistence_output"):
-                            if modifier_info["am_type"] == "add":
-                                pms_dict[pm]["subsistence_output"] = modifier_info["value"]
+                                        pms_dict[pm]['add'][modifier_info['io_type']][modifier_info['key_word']] \
+                                            = modifier_info['value']
+                                case 'mult':
+                                    pms_dict[pm]['mult'][modifier_info['io_type']][modifier_info['key_word']] \
+                                        = modifier_info['value']
+                        case ('building', 'subsistence_output'):
+                            if modifier_info['am_type'] == 'add':
+                                pms_dict[pm]['subsistence_output'] = modifier_info['value']
                             else:
-                                error.wrong_type(f"{pm}.{s.UNSCALED}.{modifier}", "add")
+                                error.wrong_type(f"{pm}.{s.UNSCALED}.{modifier}", 'add')
                         case _:
                             error.can_not_parse(f"{pm}.{s.UNSCALED}.{modifier}")
         return pms_dict
@@ -268,11 +268,11 @@ class BuildingInfoTree:
 
         localization_keys_used = [
             key for game_object in game_object_list_dict
-            if game_object not in ["script_values", "power_bloc_principles"]
+            if game_object not in ['script_values', 'power_bloc_principles']
             for key in game_object_list_dict[game_object]
         ]
 
-        principle_keys = game_object_list_dict["power_bloc_principles"]  # 原则特殊，需要单独处理
+        principle_keys = game_object_list_dict['power_bloc_principles']  # 原则特殊，需要单独处理
 
         localization_dict_used = {}
         for principle_key in principle_keys:
@@ -280,10 +280,10 @@ class BuildingInfoTree:
             if principle_match is None:
                 localization_dict_used[principle_keys] = principle_key
                 continue
-            principle_group_key = "principle_group_" + principle_match.group("name")
+            principle_group_key = 'principle_group_' + principle_match.group('name')
             if principle_group_key in localization_dict_all:
                 localization_dict_used[principle_key] = localization_dict_all[
-                                                            principle_group_key] + principle_match.group("value")
+                                                            principle_group_key] + principle_match.group('value')
             else:
                 error.lack_localization(principle_group_key)
                 localization_dict_used[principle_key] = principle_key
@@ -298,15 +298,15 @@ class BuildingInfoTree:
         tp.calibrate_localization_dict(localization_dict_used, localization_dict_all)
 
         # dummy building的本地化值过长，需要被替换，这里用本地化值的长度作为依据
-        for building in game_object_list_dict["buildings"]:
+        for building in game_object_list_dict['buildings']:
             if len(localization_dict_used[building]) > 50:
                 print(f"提醒：{building}的本地化值过长，因此被dummy代替")  # 这个特殊的提醒还是保留在这里吧
-                localization_dict_used[building] = "dummy"
+                localization_dict_used[building] = 'dummy'
 
         return localization_dict_used
 
     def __get_automation_pm_list(self):
-        return [pm for pmg, pm_list in self.pmgs_info.items() if self.localization_info[pmg] == "自动化" for pm in
+        return [pm for pmg, pm_list in self.pmgs_info.items() if self.localization_info[pmg] == '自动化' for pm in
                 pm_list]
 
     # ------------------------------------------------------------------------------------------
@@ -318,7 +318,7 @@ class BuildingInfoTree:
     def parse_buildings(self) -> list:
         buildings_list = []
         for building, building_info in self.buildings_info.items():
-            building_group, building_group_display = self.parse_building_group(self.buildings_info[building]["bg"])
+            building_group, building_group_display = self.parse_building_group(self.buildings_info[building]['bg'])
             buildings_list.append(mm.BuildingNode(
                 localization_key=building,
                 localization_value=self.localization_info[building],
@@ -334,7 +334,7 @@ class BuildingInfoTree:
     def parse_building_group(self, building_group: str) -> tuple:
         if building_group in self.building_groups_info:
             building_group_info = self.building_groups_info[building_group]
-            if len(building_group_info.parent_group) > 1 and building_group_info.parent_group[-1] == "bg_manufacturing":
+            if len(building_group_info.parent_group) > 1 and building_group_info.parent_group[-1] == 'bg_manufacturing':
                 return building_group_info, self.building_groups_info[building_group_info.parent_group[-2]]
             else:
                 return building_group_info, self.building_groups_info[building_group_info.parent_group[-1]]
@@ -370,10 +370,10 @@ class BuildingInfoTree:
                     unlocking_laws=self.parse_name(self.pms_info[pm][s.UNLOCKING_LAWS], self.laws_info),
                     disallowing_laws=self.parse_name(self.pms_info[pm][s.DISALLOWING_LAWS], self.laws_info),
                     unlocking_identity=self.parse_name(self.pms_info[pm][s.UNLOCKING_IDENTITY], self.identities_info),
-                    goods_add=self.pms_info[pm]["add"],
-                    goods_mult=self.pms_info[pm]["mult"],
+                    goods_add=self.pms_info[pm]['add'],
+                    goods_mult=self.pms_info[pm]['mult'],
                     workforce=self.pms_info[pm]['employment'],
-                    subsistence_output=self.pms_info[pm]["subsistence_output"]
+                    subsistence_output=self.pms_info[pm]['subsistence_output']
                 ))
             else:
                 error.lack_definition(pm)
