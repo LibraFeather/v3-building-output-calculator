@@ -193,7 +193,8 @@ class Calculator:
     def __transfer_dict_to_df(self, one_line_data_list, building):
         name = (f"{building.building_group_display.localization_value}"
                 f"_{building.localization_value}_{building.localization_key}.xlsx")
-        column_pmg = {pmg.localization_key: pmg.localization_value for pmg in building.children}
+        column_pmg = {pmg.localization_key: f"{pmg.localization_value}_{pmg.localization_key}"
+                      for pmg in building.children}
         colum_rename = column_pmg | self.COLUMN_HEADERS | self.COLUMN_GOODS
         rows = []
         for one_line_data in one_line_data_list:

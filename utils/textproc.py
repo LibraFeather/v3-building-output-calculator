@@ -25,13 +25,21 @@ LIST_LOGIC_KEYS = ['if', 'else_if', 'else', 'add', 'multiply', 'divide']
 def parse_yaml_line(line):
     # 查找冒号位置，分割键和值
     parts = line.split(':', 1)
-    if len(parts) == 2:
-        key = parts[0].strip()
-        value = parts[1].strip()
-        if value.startswith('"') and value.endswith('"'):
-            value = value[1:-1]
+    if len(parts) != 2:
+        return None, None
+    if not parts[1].strip():
+        return None, None
+    key = parts[0].strip()
+    value = parts[1].strip()
+    parts = value.split('"', 1)
+    if len(parts) != 2:
+        print(f"错误：{key}的本地化值{value}异常")
         return key, value
-    return None, None
+    if not parts[1].endswith('"'):
+        print(f"错误：{key}的本地化值{value}异常")
+        return key, parts[1].strip()
+    value = parts[1][:-1].strip()
+    return key, value
 
 
 def extract_localization_blocks(yaml_content: str, localization_dict=None) -> dict:
@@ -348,6 +356,5 @@ def calibrate_modifier_dict(modifier_dict: dict) -> dict:
         if isinstance(value, list):
             modifier_dict[modifier] = float(sum(value))
     return modifier_dict
-
 
 # ------------------------------------------------------------------------------------------
