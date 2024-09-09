@@ -122,7 +122,8 @@ class Calculator:
                 if tech not in techs_all:
                     techs_all.append(tech)
             add_object_to_list(combination[i].unlocking_principles, unlocking_principles)
-            add_object_to_list(combination[i].unlocking_identity, unlocking_identity)
+            if combination[i].unlocking_identity is not None:
+                unlocking_identity.append(combination[i].unlocking_identity)
             add_object_to_list(combination[i].unlocking_laws, unlocking_laws)
             add_object_to_list(combination[i].disallowing_laws, disallowing_laws)
 

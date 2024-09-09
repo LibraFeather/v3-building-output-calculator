@@ -35,7 +35,7 @@ class PMNode(Name):
     unlocking_principles: list
     unlocking_laws: list
     disallowing_laws: list
-    unlocking_identity: list
+    unlocking_identity: Name
 
 
 @dataclass

@@ -353,12 +353,3 @@ def calibrate_modifier_dict(modifier_dict: dict) -> dict:
 
 
 # ------------------------------------------------------------------------------------------
-# 其他函数
-def get_era_num(tech: str, era: str) -> int:
-    num_match = re.search(r"\d+", era)
-    if num_match:
-        return int(num_match.group())
-    else:
-        era_num = 0
-        error.can_not_parse(f"{tech}.{era}", era_num)
-        return era_num
