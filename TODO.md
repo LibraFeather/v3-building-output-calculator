@@ -14,9 +14,9 @@
 - [x] 显示具体商品的增减
 - [x] 显示建筑所在的建筑组
 - [x] 研究如何将程序转化为exe文件，以在无Python环境下运行
+- [x] 建筑本身也有科技要求
 ### 高优先级
 - [ ] 改进本地化文件的读取方式，以应对`replace`文件夹
-- [ ] 建筑本身也有科技要求
 - [ ] 改进建筑组显示方式
 ### 中优先级
 - [ ] 价格配置文件似乎不方便用户使用，需要改进
@@ -26,5 +26,5 @@
 - [ ] `utils.textproc.parse_building_modifier`支持所有类型的`building modifier`
 ## 代码优化
 - [x] `utils.textproc.parse_text_block`过于复杂，需要重构
-- [ ] `tree.BuildingInfoTree.__get_pms_info`对`modifier`的处理过于复杂，需要重构
-- [ ] `calculator.__generate_one_line_data`过于复杂，需要重构
+- [x] `tree.BuildingInfoTree.__get_pms_info`对`modifier`的处理过于复杂，需要重构
+- [x] `calculator.__generate_one_line_data`过于复杂，需要重构

@@ -1,8 +1,6 @@
-# ------------------------------------------------------------------------------------------
-
-# 文本提取函数
-
-# ------------------------------------------------------------------------------------------
+"""
+文本提取函数
+"""
 import re
 import utils.pathproc as pp
 import utils.error as error
@@ -13,9 +11,9 @@ OPERATOR_PATTERN = re.compile(r"(<|<=|=|>=|>)")
 LOCALIZATION_PATTERN = re.compile(r"^\s+[\w\-.]+:.+", re.MULTILINE)
 LOCALIZATION_REPLACE_PATTERN = re.compile(r"\$([\w\-.]+)\$")
 
-GOOD_MODIFIER_PATTERN = re.compile(r"\bgoods_(?P<io_type>input|output)_(?P<key_word>[\w\-]+?)_(?P<am_type>add|mult)\b")
+GOOD_MODIFIER_PATTERN = re.compile(r"\bgoods_(?P<io_type>input|output)_(?P<keyword>[\w\-]+?)_(?P<am_type>add|mult)\b")
 BUILDING_EMPLOYMENT_MODIFIER_PATTERN = re.compile(
-    r"\bbuilding_employment_(?P<key_word>[\w\-]+?)_(?P<am_type>add|mult)\b")
+    r"\bbuilding_employment_(?P<keyword>[\w\-]+?)_(?P<am_type>add|mult)\b")
 BUILDING_SUBSISTENCE_OUTPUT_MODIFIER_PATTERN = re.compile(r"\bbuilding_subsistence_output_(?P<am_type>add|mult)\b")
 
 # 其他变量
@@ -293,7 +291,7 @@ def parse_good_modifier(modifier: str) -> dict | None:
     else:
         return {
             'category': 'goods',
-            'key_word': modifier_match.group('key_word'),
+            'keyword': modifier_match.group('keyword'),
             'io_type': modifier_match.group('io_type'),
             'am_type': modifier_match.group('am_type')
         }
@@ -304,7 +302,7 @@ def parse_building_modifier(modifier: str) -> dict:  # TODO 这个函数仅能�
     if modifier_match is not None:
         return {
             'category': ('building', 'employment'),
-            'key_word': modifier_match.group('key_word'),
+            'keyword': modifier_match.group('keyword'),
             'am_type': modifier_match.group('am_type')
         }
     modifier_match = BUILDING_SUBSISTENCE_OUTPUT_MODIFIER_PATTERN.match(modifier)
@@ -338,7 +336,7 @@ def parse_modifier_dict(modifier_dict: dict) -> dict:
         if modifier_info is None:
             continue
         if not isinstance(value, (int, float)):
-            error.wrong_type(modifier, '数值')
+            error.wrong_type(modifier, object_type='数值')
             continue
         modifier_info['value'] = value
         modifier_info_dict[modifier] = modifier_info

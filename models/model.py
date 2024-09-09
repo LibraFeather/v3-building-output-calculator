@@ -1,3 +1,6 @@
+"""
+数据储存类
+"""
 from dataclasses import dataclass
 
 

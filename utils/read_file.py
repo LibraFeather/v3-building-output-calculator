@@ -1,3 +1,8 @@
+"""
+文件读取函数
+"""
+
+
 def read_file_with_encoding(file_path: str) -> str:
     encodings = ['utf-8-sig', 'gb2312']
     for encoding in encodings:

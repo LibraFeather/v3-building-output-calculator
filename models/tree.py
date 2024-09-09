@@ -1,5 +1,6 @@
-import re
-
+"""
+树生成类
+"""
 import utils.textproc as tp
 import utils.path_to_dict as ptd
 import utils.error as error
@@ -124,7 +125,7 @@ class BuildingInfoTree:
                 tp.calibrate_modifier_dict(pm_blocks_dict[_pm][s.BUILDING_MODIFIERS][attribute]))
             for modifier, modifier_info in modifier_dict.items():
                 category = modifier_info['category']
-                keyword = modifier_info.get('key_word', '')
+                keyword = modifier_info.get('keyword', '')
                 am_type = modifier_info['am_type']
                 io_type = modifier_info.get('io_type', '')
                 value = modifier_info['value']
@@ -132,7 +133,7 @@ class BuildingInfoTree:
                 match category:
                     case 'goods':
                         if keyword not in self.goods_info:
-                            error.lack_definition(f"{_pm}.{keyword}")
+                            error.lack_definition(_pm, keyword)
                             continue
                         match am_type:
                             case 'add':
@@ -140,12 +141,12 @@ class BuildingInfoTree:
                                     = pms_dict[_pm][am_type][io_type].get(keyword, 0) + value
                             case 'mult':
                                 if attribute != s.UNSCALED:
-                                    error.wrong_type(f"{_pm}.{attribute}.{modifier}", 'add')
+                                    error.wrong_type(_pm, attribute, modifier, object_type='add')
                                     continue
                                 pms_dict[pm][am_type][io_type][keyword] = value
                     case ('building', 'employment'):
                         if keyword not in self.pop_types_info:
-                            error.lack_definition(f"{_pm}.{modifier_info['key_word']}")
+                            error.lack_definition(_pm, keyword)
                             continue
                         match am_type:
                             case 'add':
@@ -155,7 +156,7 @@ class BuildingInfoTree:
                                 pms_dict[_pm]['employment'][keyword] = (pms_dict[_pm]['employment'].get(keyword, 0)
                                                                         + value)
                             case 'mult':
-                                error.wrong_type(f"{_pm}.{attribute}.{modifier}", 'add')
+                                error.wrong_type(_pm, attribute, modifier, object_type='add')
                     case ('building', 'subsistence_output'):
                         if attribute != s.UNSCALED:
                             error.can_not_parse(_pm, attribute, modifier)
@@ -164,7 +165,7 @@ class BuildingInfoTree:
                             case 'add':
                                 pms_dict[pm]['subsistence_output'] = value
                             case 'mult':
-                                error.wrong_type(f"{_pm}.{attribute}.{modifier}", 'add')
+                                error.wrong_type(_pm, attribute, modifier, object_type='add')
                     case _:
                         error.can_not_parse(_pm, attribute, modifier)
 
@@ -199,6 +200,7 @@ class BuildingInfoTree:
     @staticmethod
     def __get_localization_info(game_object_dict) -> dict:
         localization_dict_all = tp.get_localization_dict()
+        localization_dict_used = {}
 
         game_object_list_dict = {game_object: list(game_object_dict[game_object].keys()) for game_object in
                                  game_object_dict}
@@ -209,32 +211,15 @@ class BuildingInfoTree:
             for key in game_object_list_dict[game_object]
         ]
 
-        principle_keys = game_object_list_dict['power_bloc_principles']  # 原则特殊，需要单独处理
-
-        localization_dict_used = {}
-        for principle_key in principle_keys:
-            principle_match = re.search(r"principle_(?P<name>[\w\-]+?)_(?P<value>\d+)", principle_key)
-            if principle_match is None:
-                localization_dict_used[principle_keys] = principle_key
-                continue
-            principle_group_key = 'principle_group_' + principle_match.group('name')
-            if principle_group_key in localization_dict_all:
-                localization_dict_used[principle_key] = (localization_dict_all[principle_group_key]
-                                                         + principle_match.group('value'))
-            else:
-                error.lack_localization(principle_group_key)
-                localization_dict_used[principle_key] = principle_key
+        error.process_principle(game_object_list_dict['power_bloc_principles'],
+                                localization_dict_used, localization_dict_all)  # 单独处理原则
 
         for key in localization_keys_used:
             localization_dict_used[key] = error.get_localization(key, localization_dict_all)
 
         tp.calibrate_localization_dict(localization_dict_used, localization_dict_all)  # 替换字典中的$<字符>$
 
-        # dummy building的本地化值过长，需要被替换，这里用本地化值的长度作为依据
-        for building in game_object_list_dict['buildings']:
-            if len(localization_dict_used[building]) > 50:
-                print(f"提醒：{building}的本地化值过长，因此被dummy代替")  # 这个特殊的提醒还是保留在这里吧
-                localization_dict_used[building] = 'dummy'
+        error.process_long_building_name(game_object_list_dict['buildings'], localization_dict_used)  # 处理过长的建筑名称
 
         return localization_dict_used
 

@@ -1,3 +1,6 @@
+"""
+数据计算类
+"""
 import pandas as pd
 import itertools
 from collections import Counter
@@ -41,37 +44,35 @@ class Calculator:
     # ------------------------------------------------------------------------------------------
     def __generate_one_line_data_list_for_single_building(self, building) -> list:
         one_line_data_list = []
-        pmgs_list = [pmg.localization_key for pmg in building.children]  # 这里使用localization_key防止重复
         combinations = itertools.product(*(node.children for node in building.children))
 
         for combination in combinations:
-            pms_list = []
-            can_generate_data = True
-            for pm in combination:
-                pms_list.append(pm.localization_key)
-            for pm in combination:
-                if pm.unlocking_production_methods:
-                    if not list(set(pm.unlocking_production_methods) & set(pms_list)):
-                        can_generate_data = False
-                        break
+            pms_set = {pm.localization_key for pm in combination}
+            # 检查每个 pm 的 unlocking_production_methods 是否与 pms_set 有交集，除非它是空集
+            can_generate_data = all(
+                pm.unlocking_production_methods == [] or set(pm.unlocking_production_methods) & pms_set
+                for pm in combination
+            )
+
             if can_generate_data:
-                one_line_data = self.__generate_one_line_data(combination, pmgs_list, building)
-                one_line_data_finished = self.__calculate_data(one_line_data, building)
-                one_line_data_list.append(one_line_data_finished)
+                pmgs_list = [pmg.localization_key for pmg in building.children]  # 这里使用localization_key防止重复
+                one_line_data = self.__generate_one_line_data(dict(zip(pmgs_list, combination)), building)
+                one_line_data = self.__calculate_data(one_line_data, building)
+                one_line_data_list.append(one_line_data)
         return one_line_data_list
 
-    def __generate_one_line_data(self, combination: tuple, pmgs_list: list, building) -> dict:
+    def __generate_one_line_data(self, pmg_to_combination_map: dict, building) -> dict:
         def check_workforce_positive(workforce_dict: dict) -> dict:
-            for _, v in workforce_dict.items():
+            for k, v in workforce_dict.items():
                 if v < 0:
-                    workforce_dict[_] = 0
+                    workforce_dict[k] = 0
             return workforce_dict
 
         def calculate_good(goods_add, goods_mult):
-            for _good in goods_add:
-                if _good in goods_mult:
-                    mult = 1 + goods_mult[_good]
-                    goods_add[_good] = goods_add[_good] * mult if mult > 0 else 0
+            for good in goods_add:
+                if good in goods_mult:
+                    mult = 1 + goods_mult[good]
+                    goods_add[good] = goods_add[good] * mult if mult > 0 else 0
             return goods_add
 
         def add_object_to_list(objects_list: list, new_list: list) -> None:
@@ -86,7 +87,7 @@ class Calculator:
         workforce = Counter()
         one_line_data = {'raw_data': {}, 'pm_data': {}, 'processed_data': {}, 'other_data': {}, 'goods_data': {}}
 
-        # TODO 这里需要进一步简化代码
+        # 处理建筑本身的科技需求
         if building.unlocking_technologies:
             era = max(building.unlocking_technologies, key=lambda _tech: _tech.era).era
             highest_tech = []
@@ -104,16 +105,17 @@ class Calculator:
         unlocking_identity = []
         unlocking_laws = []
         disallowing_laws = []
-        for i in range(len(pmgs_list)):
-            goods_input_add.update(combination[i].goods_add['input'])
-            goods_output_add.update(combination[i].goods_add['output'])
-            goods_input_mult.update(combination[i].goods_mult['input'])
-            goods_output_mult.update(combination[i].goods_mult['output'])
-            workforce.update(combination[i].workforce)
-            subsistence_output += combination[i].subsistence_output
 
-            one_line_data['pm_data'][pmgs_list[i]] = combination[i].localization_value
-            for tech in combination[i].unlocking_technologies:
+        for pmg, pm in pmg_to_combination_map.items():
+            goods_input_add.update(pm.goods_add['input'])
+            goods_output_add.update(pm.goods_add['output'])
+            goods_input_mult.update(pm.goods_mult['input'])
+            goods_output_mult.update(pm.goods_mult['output'])
+            workforce.update(pm.workforce)
+            subsistence_output += pm.subsistence_output
+
+            one_line_data['pm_data'][pmg] = pm.localization_value
+            for tech in pm.unlocking_technologies:
                 if tech.era > era:
                     era = tech.era
                     highest_tech = [tech]
@@ -121,11 +123,11 @@ class Calculator:
                     highest_tech.append(tech)
                 if tech not in techs_all:
                     techs_all.append(tech)
-            add_object_to_list(combination[i].unlocking_principles, unlocking_principles)
-            if combination[i].unlocking_identity is not None:
-                unlocking_identity.append(combination[i].unlocking_identity)
-            add_object_to_list(combination[i].unlocking_laws, unlocking_laws)
-            add_object_to_list(combination[i].disallowing_laws, disallowing_laws)
+            add_object_to_list(pm.unlocking_principles, unlocking_principles)
+            if pm.unlocking_identity is not None:
+                unlocking_identity.append(pm.unlocking_identity)
+            add_object_to_list(pm.unlocking_laws, unlocking_laws)
+            add_object_to_list(pm.disallowing_laws, disallowing_laws)
 
         one_line_data['raw_data'] = {
             'goods_input': calculate_good(dict(goods_input_add), dict(goods_input_mult)),
@@ -153,38 +155,33 @@ class Calculator:
         return one_line_data
 
     def __calculate_data(self, one_line_data: dict, building) -> dict:
-        """
-        #! 计算8项：商品总投入/商品总产出/劳动力总数/利润/人均利润/利润除以建造力/回报率/工资倍率
-        利润 = 商品产出总产值 - 商品投入总产值
-        人均利润 = 利润/劳动力人数总和 * 52
-        利润/建造力 = 利润/建筑建造力
-        回报率 = 商品产出总产值/商品投入总产值
-        工资倍率 = 劳动力工资权重的加权平均
-        """
-        input_cost = sum(one_line_data['raw_data']['goods_input'][good] * self.goods_info[good].cost
-                         for good in one_line_data['raw_data']['goods_input'])
-        output_cost = sum(one_line_data['raw_data']['goods_output'][good] * self.goods_info[good].cost
-                          for good in one_line_data['raw_data']['goods_output'])
-        workforce_population = sum(one_line_data['raw_data']['workforce'].values())
-        profit = output_cost - input_cost + sum(
-            one_line_data['raw_data']['subsistence_output'] * one_line_data['raw_data']['workforce'][pop_type] *
-            self.pop_type_info[pop_type].subsistence_income for pop_type in one_line_data['raw_data']['workforce']) / 52
+        goods_input = one_line_data['raw_data']['goods_input']
+        goods_output = one_line_data['raw_data']['goods_output']
+        workforce = one_line_data['raw_data']['workforce']
+        subsistence_output = one_line_data['raw_data']['subsistence_output']
+
+        input_cost = sum(goods_input[good] * self.goods_info[good].cost for good in goods_input)
+        output_cost = sum(goods_output[good] * self.goods_info[good].cost for good in goods_output)
+        workforce_population = sum(workforce.values())
+        profit = (output_cost - input_cost
+                  + sum(subsistence_output * workforce[pop_type] * self.pop_type_info[pop_type].subsistence_income
+                        for pop_type in workforce) / 52)
         per_capita_profit = profit / workforce_population * 52 if workforce_population else 'Null'
         per_cc_profit = profit / building.required_construction if building.required_construction else 'Null'
         rate_of_return = output_cost / input_cost if input_cost > 0 else 'Null'
-        wage_weight = sum(
-            one_line_data['raw_data']['workforce'][pop_type] * self.pop_type_info[pop_type].wage_weight for pop_type in
-            one_line_data['raw_data'][
-                'workforce']) / workforce_population if workforce_population else 'Null'
+        wage_weight = (sum(workforce[pop_type] * self.pop_type_info[pop_type].wage_weight for pop_type in workforce)
+                       / workforce_population) if workforce_population else 'Null'
 
-        one_line_data['processed_data']['input_cost'] = input_cost
-        one_line_data['processed_data']['output_cost'] = output_cost
-        one_line_data['processed_data']['workforce_population'] = workforce_population
-        one_line_data['processed_data']['profit'] = profit
-        one_line_data['processed_data']['per_capita_profit'] = per_capita_profit
-        one_line_data['processed_data']['per_cc_profit'] = per_cc_profit
-        one_line_data['processed_data']['rate_of_return'] = rate_of_return
-        one_line_data['processed_data']['wage_weight'] = wage_weight
+        one_line_data['processed_data'] = {
+            'input_cost': input_cost,
+            'output_cost': output_cost,
+            'workforce_population': workforce_population,
+            'profit': profit,
+            'per_capita_profit': per_capita_profit,
+            'per_cc_profit': per_cc_profit,
+            'rate_of_return': rate_of_return,
+            'wage_weight': wage_weight
+        }
         del one_line_data['raw_data']
         return one_line_data
 
@@ -194,14 +191,20 @@ class Calculator:
                 self.building_info_tree]
 
     def __transfer_dict_to_df(self, one_line_data_list, building):
-        pmg_list = building.children
-        column_pmg = {pmg.localization_key: pmg.localization_value for pmg in pmg_list}
+        name = (f"{building.building_group_display.localization_value}"
+                f"_{building.localization_value}_{building.localization_key}.xlsx")
+        column_pmg = {pmg.localization_key: pmg.localization_value for pmg in building.children}
         colum_rename = column_pmg | self.COLUMN_HEADERS | self.COLUMN_GOODS
         rows = []
         for one_line_data in one_line_data_list:
             row = one_line_data['pm_data'] | one_line_data['processed_data'] | one_line_data['other_data'] | \
                   one_line_data['goods_data']
             rows.append(row)
+
+        if not rows:
+            print(f"错误：未知错误，{name}无法输出")
+            return None
+
         building_info_df = pd.DataFrame(rows)
 
         for good_info in self.goods_info.values():
@@ -212,7 +215,6 @@ class Calculator:
                 building_info_df.drop(key, axis=1, inplace=True)
 
         building_info_df.rename(columns=colum_rename, inplace=True)
-        name = f"{building.building_group_display.localization_value}_{building.localization_value}_{building.localization_key}.xlsx"
         building_info_df.to_excel(
             f"{OUTPUT_PATH}\\buildings\\{name}", index=False)
         print(f'{name}输出成功')
@@ -222,12 +224,15 @@ class Calculator:
             self.__transfer_dict_to_df(one_line_data_list, building)
 
     def output_all_buildings(self):
+        name = "00_总表.xlsx"
         rows = []
-        max_len_pmg = 0
-        if self.building_output_info_list:
+        try:
             max_len_pmg = max(
                 len(one_line_data['pm_data']) for building_info in self.building_output_info_list for one_line_data in
                 building_info[1])
+        except ValueError:
+            print(f"错误：未知错误，{name}无法输出")
+            return None
 
         is_pmg_count_leq_4 = bool(max_len_pmg <= 4)
         if is_pmg_count_leq_4:
@@ -251,14 +256,9 @@ class Calculator:
                 rows.append(row)
         summary_table_df = pd.DataFrame(rows)
         summary_table_df.rename(columns=self.COLUMN_HEADERS | self.COLUMN_GOODS, inplace=True)
-        summary_table_df.to_excel(f"{OUTPUT_PATH}\\buildings\\00_总表.xlsx", index=False)
-        print("总表.xlsx输出成功")
+        summary_table_df.to_excel(f"{OUTPUT_PATH}\\buildings\\{name}", index=False)
+        print(f"{name}输出成功")
 
     def output(self):
         self.output_every_building()
         self.output_all_buildings()
-
-
-if __name__ == '__main__':
-    calculator = Calculator()
-    calculator.output()
