@@ -3,48 +3,21 @@
 """
 import re
 
+from utils.config_loader import open_json
+
+config = open_json('config\\warning_settings.json')
+
+if config is not None:
+    SHOW_DUPLICATE_KEY_WARNING = config.get('SHOW_DUPLICATE_KEY_WARNING', '') == 'True'
+    SHOW_LOCALIZATION_WARNING = config.get('SHOW_LOCALIZATION_WARNING', '') == 'True'
+    SHOW_LACK_LOCALIZATION_WARNING = config.get('SHOW_LACK_LOCALIZATION_WARNING', '') == 'True'
+else:
+    SHOW_DUPLICATE_KEY_WARNING = False
+    SHOW_LOCALIZATION_WARNING = False
+    SHOW_LACK_LOCALIZATION_WARNING = False
+
 
 # ------------------------------------------------------------------------------------------
-# 基本函数
-def lack_definition(*object_names: str, value=None):
-    object_name = merge_game_objects(object_names)
-    error_info = f"错误：{object_name}无定义"
-    assumption_value(error_info, value)
-
-
-def lack_attribute(*object_names, attribute: str, value=None):
-    object_name = merge_game_objects(object_names)
-    error_info = f"错误：{object_name}缺失{attribute}"
-    assumption_value(error_info, value)
-
-
-def lack_localization(object_name: str):
-    print(f"提醒：{object_name}缺失本地化")
-
-
-def wrong_type(*object_names, object_type, value=None):
-    object_name = merge_game_objects(object_names)
-    if object_type == '异常':
-        error_info = f"错误：{object_name}格式异常"
-    else:
-        error_info = f"错误：{object_name}的类型不是{object_type}"
-    assumption_value(error_info, value)
-
-
-def wrong_path(path: str):
-    print(f"错误：路径{path}设置错误")
-
-
-def can_not_parse(*object_names, value=None):
-    object_name = merge_game_objects(object_names)
-    error_info = f"提醒：{object_name}无法被解析"
-    assumption_value(error_info, value)
-
-
-def merge_game_objects(object_names) -> str:
-    return ".".join(object_names)
-
-
 def assumption_value(error_info: str, value):
     if value is None:
         print(error_info)
@@ -52,14 +25,97 @@ def assumption_value(error_info: str, value):
         print(error_info + f"，因此假定为{value}")
 
 
-# ------------------------------------------------------------------------------------------
-def get_attribute(object_name: str, object_blocks_dict: dict, attribute: str, value=None, show_error=True):
-    if attribute in object_blocks_dict[object_name]:
-        return object_blocks_dict[object_name][attribute]
+def merge_game_objects(object_names) -> str:
+    object_names = [str(item) for item in object_names]
+    return ".".join(object_names)
+
+
+def wrong_name(*object_names: str):
+    object_name = merge_game_objects(object_names)
+    print(f"错误：名称错误，{object_name}")
+
+
+def wrong_type(*object_names, object_type, value=None):
+    object_name = merge_game_objects(object_names)
+    if object_type == '异常':
+        error_info = f"错误：对象类型异常，{object_name}"
     else:
+        error_info = f"错误：对象类型异常，{object_name}的类型不是{object_type}"
+    assumption_value(error_info, value)
+
+
+def wrong_path(path: str, path_type: str):
+    print(f"错误：路径错误，{path_type}，{path}")
+
+
+def wrong_localization(key: str, value: str):
+    if SHOW_LOCALIZATION_WARNING:
+        print(f"错误：本地化值异常，{key}的{value}")
+
+
+# 基本函数
+def lack_definition(*object_names: str, value=None):
+    object_name = merge_game_objects(object_names)
+    error_info = f"错误：对象无定义，{object_name}"
+    assumption_value(error_info, value)
+
+
+def lack_attribute(*object_names, attribute: str, value=None):
+    object_name = merge_game_objects(object_names)
+    error_info = f"错误：对象属性缺失，{object_name}的{attribute}"
+    assumption_value(error_info, value)
+
+
+def lack_localization(object_name: str):
+    if SHOW_LACK_LOCALIZATION_WARNING:
+        print(f"提醒：对象本地化缺失，{object_name}")
+
+
+def can_not_parse(*object_names, value=None):
+    object_name = merge_game_objects(object_names)
+    error_info = f"提醒：对象无法解析，{object_name}"
+    assumption_value(error_info, value)
+
+
+def can_not_output(name: str):
+    print(f"错误：未知错误，{name}无法输出")
+
+
+def check_filename(filename):
+    illegal_chars_regex = r'[<>:"/\\|?*]'
+    if re.search(illegal_chars_regex, filename):
+        print(f"错误：非法字符，{filename}")
+        return re.sub(illegal_chars_regex, '', filename)
+    else:
+        return filename
+
+
+def check_objects_dict(objects_dict: dict, object_type: str) -> dict:
+    processed_objects_dict = {}
+    for game_object, game_object_info in objects_dict.items():
+        if not isinstance(game_object_info, dict):
+            if game_object[0] != "@":
+                print(f"错误：文件格式错误，{object_type}的{game_object}")
+        else:
+            processed_objects_dict[game_object] = game_object_info
+    return processed_objects_dict
+
+
+def duplicate_key(key: str):
+    if SHOW_DUPLICATE_KEY_WARNING:
+        print(f"提醒：重复出现{key}，新值将会覆盖旧值")
+
+
+# ------------------------------------------------------------------------------------------
+def get_attribute(object_name: str, object_blocks_dict: dict, attribute: str, value, value_type, show_error=True):
+    if attribute not in object_blocks_dict[object_name]:
         if show_error:
             lack_attribute(object_name, attribute=attribute)
         return value
+    if isinstance(object_blocks_dict[object_name][attribute], value_type):
+        return object_blocks_dict[object_name][attribute]
+    wrong_type(object_name, attribute, object_blocks_dict[object_name][attribute], object_type=value_type)
+    return value
 
 
 def has_attribute(object_name: str, object_blocks_dict: dict, attribute: str, show_error=True) -> bool:
@@ -99,13 +155,16 @@ def find_numeric_value(var_value, var_dict: dict) -> int | float:
 def get_era_num(era, tech: str) -> int:
     if isinstance(era, int):
         return era
-    num_match = re.search(r"\d+", era)
-    if num_match:
-        return int(num_match.group())
+    elif isinstance(era, str):
+        num_match = re.search(r"\d+", era)
+        if num_match:
+            return int(num_match.group())
+        else:
+            era_num = 0
+            can_not_parse(tech, era, value=era_num)
+            return era_num
     else:
-        era_num = 0
-        can_not_parse(tech, era, value=era_num)
-        return era_num
+        wrong_type(era, object_type='数值')
 
 
 def process_principle(principle_keys: list, localization_dict_used: dict, localization_dict_all: dict):
@@ -126,5 +185,5 @@ def process_principle(principle_keys: list, localization_dict_used: dict, locali
 def process_long_building_name(buildings: list, localization_dict_used: dict):
     for building in buildings:  # dummy building的本地化值过长，需要被替换，这里用本地化值的长度作为依据
         if len(localization_dict_used[building]) > 50:
-            print(f"提醒：{building}的本地化值过长，因此被dummy代替")
+            print(f"提醒：本地化值过长，{building}，因此被dummy代替")
             localization_dict_used[building] = 'dummy'

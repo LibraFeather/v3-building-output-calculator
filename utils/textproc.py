@@ -7,7 +7,7 @@ import utils.error as error
 import utils.read_file as rf
 
 # 正则表达式
-OPERATOR_PATTERN = re.compile(r"(<|<=|=|>=|>)")
+OPERATOR_PATTERN = re.compile(r"(<=|<|=|>=|>)")
 LOCALIZATION_PATTERN = re.compile(r"^\s+[\w\-.]+:.+", re.MULTILINE)
 LOCALIZATION_REPLACE_PATTERN = re.compile(r"\$([\w\-.]+)\$")
 
@@ -33,10 +33,10 @@ def parse_yaml_line(line):
     value = parts[1].strip()
     parts = value.split('"', 1)
     if len(parts) != 2:
-        print(f"错误：{key}的本地化值{value}异常")
+        error.wrong_localization(key, value)
         return key, value
     if not parts[1].endswith('"'):
-        print(f"错误：{key}的本地化值{value}异常")
+        error.wrong_localization(key, value)
         return key, parts[1].strip()
     value = parts[1][:-1].strip()
     return key, value
@@ -147,7 +147,7 @@ def parse_text_block(start: int, text: str, file_path: str) -> tuple:
                 if not stack:
                     return " " + text[_start + 1:k], k + 1  # 不包括两端的括号
         if file_path is not None:
-            print(f"错误：{file_path}花括号不匹配")
+            print(f"错误：花括号不匹配{file_path}")
         else:
             print(f"错误：文件花括号不匹配")
         return text[_start + 1:], len_text + 1  # 如果花括号不匹配，输出后面全部的文件
@@ -163,8 +163,20 @@ def parse_text_block(start: int, text: str, file_path: str) -> tuple:
     operator, operator_start, operator_end = find_first_operator(text, start)
     len_text = len(text)
     if operator is None:
+        remaining = text[start:len_text].strip()
+        if remaining:
+            if file_path is not None:
+                print(f"错误：文件内容异常，{file_path}的{remaining}")
+            else:
+                print(f"错误：文件内容异常，{remaining}")
         return '', '', len_text + 1
-    name = text[start:operator_start].strip() + (f".[{operator}]" if operator != '=' else '')  # 记录符号，除非是等号
+
+    name = text[start:operator_start].strip()
+    if re.search(r'\s', name):
+        segments = re.split(r'\s+', name)
+        name = segments[-1] if segments else ''
+    name += f".[{operator}]" if operator != '=' else ''  # 记录符号，除非是等号
+
     first_non_space = re.search(r"\S+", text[operator_end:len_text])
     if first_non_space is None:
         return name, '', len_text + 1
@@ -211,7 +223,7 @@ def convert_text_into_dict(text: str, blocks_dict=None, logic_keys_dict=None, ov
             blocks_dict[key] = value
             continue
         if override:
-            print(f"提醒：{key}重复出现，新值将会覆盖旧值")
+            error.duplicate_key(key)
             blocks_dict[key] = value
             continue
         if isinstance(blocks_dict[key], list):

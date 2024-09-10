@@ -2,7 +2,7 @@
 树生成类
 """
 import utils.textproc as tp
-import utils.path_to_dict as ptd
+import utils.game_data_mapper as ptd
 import utils.error as error
 from utils.config import GOODS_COST_OFFSET
 import constants.str as s
@@ -21,6 +21,9 @@ class BuildingInfoTree:
                            'power_bloc_principles',
                            'production_method_groups', 'production_methods', 'script_values', 'technologies']
         game_object_dict = ptd.get_game_object_dict(game_objet_need)
+        for game_object in game_object_dict:
+            if game_object != 'script_values':
+                game_object_dict[game_object] = error.check_objects_dict(game_object_dict[game_object], game_object)
 
         self.localization_info = self.__get_localization_info(game_object_dict)
 
@@ -51,7 +54,7 @@ class BuildingInfoTree:
 
         building_groups_dict = {
             building_group: error.get_attribute(building_group, building_groups_blocks_dict, s.PARENT_GROUP, '',
-                                                False)
+                                                str, False)
             for building_group in building_groups_blocks_dict
         }
 
@@ -73,7 +76,7 @@ class BuildingInfoTree:
     @staticmethod
     def __get_technologies_info(technology_blocks_dict) -> dict:
         return {
-            technology: error.get_era_num(error.get_attribute(technology, technology_blocks_dict, s.ERA, 0),
+            technology: error.get_era_num(error.get_attribute(technology, technology_blocks_dict, s.ERA, 0, str),
                                           technology)
             for technology in technology_blocks_dict
         }
@@ -84,7 +87,7 @@ class BuildingInfoTree:
             good: mm.GoodNode(
                 localization_key=good,
                 localization_value=self.localization_info[good],
-                cost=error.get_attribute(good, good_blocks_dict, s.COST, 0) * GOODS_COST_OFFSET.get(good, 1.0)
+                cost=error.get_attribute(good, good_blocks_dict, s.COST, 0, (int, float)) * GOODS_COST_OFFSET.get(good, 1.0)
             )
             for good in good_blocks_dict
         }
@@ -94,7 +97,7 @@ class BuildingInfoTree:
             pop_type: mm.POPTypeNode(
                 localization_key=pop_type,
                 localization_value=self.localization_info[pop_type],
-                wage_weight=error.get_attribute(pop_type, pop_blocks_dict, s.WAGE_WEIGHT, 0),
+                wage_weight=error.get_attribute(pop_type, pop_blocks_dict, s.WAGE_WEIGHT, 0, (int, float)),
                 subsistence_income=error.has_attribute(pop_type, pop_blocks_dict, s.SUBSISTENCE_INCOME, False)
             )
             for pop_type in pop_blocks_dict
@@ -105,17 +108,17 @@ class BuildingInfoTree:
             building: {
                 'cost': error.find_numeric_value(building_blocks_dict[building].get(s.REQUIRED_CONSTRUCTION, 0),
                                                  self.scrit_values_info),
-                'pmgs': error.get_attribute(building, building_blocks_dict, s.PRODUCTION_METHOD_GROUPS, []),
-                'bg': error.get_attribute(building, building_blocks_dict, s.BUILDING_GROUP, ''),
+                'pmgs': error.get_attribute(building, building_blocks_dict, s.PRODUCTION_METHOD_GROUPS, [], list),
+                'bg': error.get_attribute(building, building_blocks_dict, s.BUILDING_GROUP, '', str),
                 'unlocking_technologies': building_blocks_dict[building].get(s.UNLOCKING_TECHNOLOGIES, [])
             }
-            for building in building_blocks_dict
+            for building in building_blocks_dict if isinstance(building_blocks_dict[building], dict)
         }
 
     @staticmethod
     def __get_pmgs_info(pmg_blocks_dict) -> dict:
         return {
-            pmg: error.get_attribute(pmg, pmg_blocks_dict, s.PRODUCTION_METHODS, [], True)
+            pmg: error.get_attribute(pmg, pmg_blocks_dict, s.PRODUCTION_METHODS, [], list, True)
             for pmg in pmg_blocks_dict
         }
 

@@ -7,6 +7,7 @@ from collections import Counter
 
 from models.tree import BuildingInfoTree
 from constants.path import OUTPUT_PATH
+import utils.error as error
 
 
 class Calculator:
@@ -193,6 +194,7 @@ class Calculator:
     def __transfer_dict_to_df(self, one_line_data_list, building):
         name = (f"{building.building_group_display.localization_value}"
                 f"_{building.localization_value}_{building.localization_key}.xlsx")
+        name = error.check_filename(name)
         column_pmg = {pmg.localization_key: f"{pmg.localization_value}_{pmg.localization_key}"
                       for pmg in building.children}
         colum_rename = column_pmg | self.COLUMN_HEADERS | self.COLUMN_GOODS
@@ -203,7 +205,7 @@ class Calculator:
             rows.append(row)
 
         if not rows:
-            print(f"错误：未知错误，{name}无法输出")
+            error.can_not_output(name)
             return None
 
         building_info_df = pd.DataFrame(rows)
@@ -232,12 +234,13 @@ class Calculator:
                 len(one_line_data['pm_data']) for building_info in self.building_output_info_list for one_line_data in
                 building_info[1])
         except ValueError:
-            print(f"错误：未知错误，{name}无法输出")
+            error.can_not_output(name)
             return None
 
         is_pmg_count_leq_4 = bool(max_len_pmg <= 4)
         if is_pmg_count_leq_4:
             column_4pm = ['基础', '次要', '自动化', '其他']
+            max_len_pmg = 4
         else:
             column_4pm = list(range(max_len_pmg))
         for building, building_info_list in self.building_output_info_list:
