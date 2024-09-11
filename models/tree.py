@@ -87,7 +87,8 @@ class BuildingInfoTree:
             good: mm.GoodNode(
                 localization_key=good,
                 localization_value=self.localization_info[good],
-                cost=error.get_attribute(good, good_blocks_dict, s.COST, 0, (int, float)) * GOODS_COST_OFFSET.get(good, 1.0)
+                cost=error.get_attribute(good, good_blocks_dict, s.COST, 0, (int, float)) * GOODS_COST_OFFSET.get(good,
+                                                                                                                  1.0)
             )
             for good in good_blocks_dict
         }
@@ -106,7 +107,9 @@ class BuildingInfoTree:
     def __get_buildings_info(self, building_blocks_dict) -> dict:
         return {
             building: {
-                'cost': error.find_numeric_value(building_blocks_dict[building].get(s.REQUIRED_CONSTRUCTION, 0),
+                'cost': error.find_numeric_value(error.get_attribute(building, building_blocks_dict,
+                                                                     s.REQUIRED_CONSTRUCTION, 0,
+                                                                     (int, float, str), False),
                                                  self.scrit_values_info),
                 'pmgs': error.get_attribute(building, building_blocks_dict, s.PRODUCTION_METHOD_GROUPS, [], list),
                 'bg': error.get_attribute(building, building_blocks_dict, s.BUILDING_GROUP, '', str),
@@ -125,7 +128,9 @@ class BuildingInfoTree:
     def __get_pms_info(self, pm_blocks_dict) -> dict:
         def update_pms_dict(_pm: str, attribute: str):
             modifier_dict = tp.parse_modifier_dict(
-                tp.calibrate_modifier_dict(pm_blocks_dict[_pm][s.BUILDING_MODIFIERS][attribute]))
+                _pm, attribute,
+                modifier_dict=tp.calibrate_modifier_dict(pm_blocks_dict[_pm][s.BUILDING_MODIFIERS][attribute])
+            )
             for modifier, modifier_info in modifier_dict.items():
                 category = modifier_info['category']
                 keyword = modifier_info.get('keyword', '')

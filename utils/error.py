@@ -1,9 +1,11 @@
 """
 错误处理函数
 """
+import os.path
 import re
 
 from utils.config_loader import open_json
+from utils.config import VANILLA_PATH
 
 config = open_json('config\\warning_settings.json')
 
@@ -30,9 +32,34 @@ def merge_game_objects(object_names) -> str:
     return ".".join(object_names)
 
 
-def wrong_name(*object_names: str):
-    object_name = merge_game_objects(object_names)
-    print(f"错误：名称错误，{object_name}")
+def check_remaining(path: str, text: str):
+    if text:
+        if path is None:
+            path = ''
+        if text == '}':
+            redundant_bracket(path)
+        else:
+            print(f"错误：文件存在无法解析内容，{path}.{text}")
+
+
+def wrong_quotes(path: str, text: str):
+    if path is None:
+        path = ''
+    print(f"错误：引号未闭合，{path}.{text}")
+
+
+def wrong_name(path: str, names: list):
+    if path is None:
+        path = ''
+    for name in names:
+        if name == '}':
+            redundant_bracket(path)
+        else:
+            print(f"错误：名称错误，{path}.{name}")
+
+
+def redundant_bracket(path: str):
+    print(f"错误：多余大括号，{path}")
 
 
 def wrong_type(*object_names, object_type, value=None):
@@ -44,13 +71,30 @@ def wrong_type(*object_names, object_type, value=None):
     assumption_value(error_info, value)
 
 
-def wrong_path(path: str, path_type: str):
-    print(f"错误：路径错误，{path_type}，{path}")
-
-
-def wrong_localization(key: str, value: str):
+def empty_key(value: str):
     if SHOW_LOCALIZATION_WARNING:
-        print(f"错误：本地化值异常，{key}的{value}")
+        print(f"错误：本地化键缺失，{value}的本地化键")
+
+
+def empty_value(key: str):
+    if SHOW_LOCALIZATION_WARNING:
+        print(f"错误：本地化值缺失，{key}的本地化值")
+
+
+def check_quotation_mark(key: str, value: str):
+    if SHOW_LOCALIZATION_WARNING:
+        print(f"错误：本地化值引号缺失，{key}: {value}")
+
+
+def check_unclosed_quotes(key: str, value: str):
+    if SHOW_LOCALIZATION_WARNING:
+        print(f"错误：本地化值引号未闭合，{key}: {value}")
+
+
+def check_bracket(path: str):
+    if path is None:
+        path = ''
+    print(f"错误：文件缺失花括号，{path}")
 
 
 # 基本函数
@@ -62,7 +106,7 @@ def lack_definition(*object_names: str, value=None):
 
 def lack_attribute(*object_names, attribute: str, value=None):
     object_name = merge_game_objects(object_names)
-    error_info = f"错误：对象属性缺失，{object_name}的{attribute}"
+    error_info = f"错误：对象属性缺失，{object_name}.{attribute}"
     assumption_value(error_info, value)
 
 
@@ -101,9 +145,28 @@ def check_objects_dict(objects_dict: dict, object_type: str) -> dict:
     return processed_objects_dict
 
 
-def duplicate_key(key: str):
+def duplicate_key(key: str, path=None):
     if SHOW_DUPLICATE_KEY_WARNING:
-        print(f"提醒：重复出现{key}，新值将会覆盖旧值")
+        if path is None:
+            return print(f"提醒：重复对象，{key}")
+        key_type = 'Mod'
+        if is_subpath(VANILLA_PATH, path):
+            key_type = 'Vanilla'
+        path = os.path.basename(path)
+        print(f"提醒：重复对象，{key_type}.{path}.{key}")
+
+
+def is_subpath(parent_path, child_path):
+    # 将路径转换为规范化的形式，以避免路径中的"."和".."造成的歧义
+    parent_path = re.escape(parent_path)
+    child_path = re.escape(child_path)
+
+    # 构建正则表达式，用于匹配子路径
+    # 这个正则表达式检查child_path是否以parent_path开头，并且之后是路径分隔符或字符串结束
+    pattern = f"^{re.escape(parent_path)}(?=/|\\Z)"
+
+    # 使用正则表达式进行匹配
+    return re.search(pattern, child_path) is not None
 
 
 # ------------------------------------------------------------------------------------------
@@ -112,9 +175,26 @@ def get_attribute(object_name: str, object_blocks_dict: dict, attribute: str, va
         if show_error:
             lack_attribute(object_name, attribute=attribute)
         return value
-    if isinstance(object_blocks_dict[object_name][attribute], value_type):
-        return object_blocks_dict[object_name][attribute]
-    wrong_type(object_name, attribute, object_blocks_dict[object_name][attribute], object_type=value_type)
+    attribute_value = object_blocks_dict[object_name][attribute]
+    return check_attribute_value(object_name, attribute,
+                                 attribute_value=attribute_value, value=value, value_type=value_type)
+
+
+def check_attribute_value(*object_names, attribute_value, value, value_type):
+    object_name = merge_game_objects(object_names)
+    if isinstance(attribute_value, value_type):
+        return attribute_value
+    if not attribute_value:
+        error_info = f"错误：属性的值为空，{object_name}"
+        assumption_value(error_info, value)
+        return value
+    if isinstance(attribute_value, list):
+        value = check_attribute_value(
+            *object_names, attribute_value=attribute_value[-1], value=0, value_type=value_type)
+        error_info = f"错误：属性多次赋值，{object_name}"
+        assumption_value(error_info, value)
+        return value
+    wrong_type(*object_names, attribute_value, object_type=value_type)
     return value
 
 
@@ -142,7 +222,7 @@ def find_numeric_value(var_value, var_dict: dict) -> int | float:
             lack_definition(var_value, value=value)
             return value
         if not isinstance(var_dict[var_value], (int, float)):
-            wrong_type(var_value, object_type='数值', value=value)
+            wrong_type(var_value, object_type=(int, float), value=value)
             return value
         return var_dict[var_value]
     if isinstance(var_value, (int, float)):
@@ -164,7 +244,7 @@ def get_era_num(era, tech: str) -> int:
             can_not_parse(tech, era, value=era_num)
             return era_num
     else:
-        wrong_type(era, object_type='数值')
+        wrong_type(tech, era, object_type=int)
 
 
 def process_principle(principle_keys: list, localization_dict_used: dict, localization_dict_all: dict):

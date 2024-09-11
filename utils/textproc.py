@@ -2,12 +2,14 @@
 文本提取函数
 """
 import re
+import os
 import utils.pathproc as pp
 import utils.error as error
 import utils.read_file as rf
+from utils.config import LOCALIZATION
 
 # 正则表达式
-OPERATOR_PATTERN = re.compile(r"(<=|<|=|>=|>)")
+OPERATOR_PATTERN = re.compile(r"(!=|\?=|<=|<|=|>=|>)")
 LOCALIZATION_PATTERN = re.compile(r"^\s+[\w\-.]+:.+", re.MULTILINE)
 LOCALIZATION_REPLACE_PATTERN = re.compile(r"\$([\w\-.]+)\$")
 
@@ -23,22 +25,36 @@ LIST_LOGIC_KEYS = ['if', 'else_if', 'else', 'add', 'multiply', 'divide']
 # ------------------------------------------------------------------------------------------
 # 以下函数专门处理本地化
 def parse_yaml_line(line):
+    def check_empty(checked: str, loc_type: str):
+        if not checked:
+            if loc_type == 'key':
+                error.empty_key(value)
+            elif loc_type == 'value':
+                error.empty_value(key)
+            return '', ''
+
     # 查找冒号位置，分割键和值
     parts = line.split(':', 1)
     if len(parts) != 2:
-        return None, None
-    if not parts[1].strip():
-        return None, None
+        return '', ''
     key = parts[0].strip()
+    if key == f"l_{LOCALIZATION}":
+        return '', ''
     value = parts[1].strip()
-    parts = value.split('"', 1)
-    if len(parts) != 2:
-        error.wrong_localization(key, value)
+    check_empty(key, 'key')
+    check_empty(value, 'value')
+
+    quotation_mark = re.search(r"\"", value)
+    if not quotation_mark:
+        error.check_quotation_mark(key, value)
+        return '', ''
+
+    value = value[quotation_mark.end():]
+    check_empty(value, 'value')
+    if not value.endswith('"'):
+        error.check_unclosed_quotes(key, value)
         return key, value
-    if not parts[1].endswith('"'):
-        error.wrong_localization(key, value)
-        return key, parts[1].strip()
-    value = parts[1][:-1].strip()
+    value = value[:-1]
     return key, value
 
 
@@ -64,18 +80,16 @@ def extract_localization_blocks(yaml_content: str, localization_dict=None) -> di
         # 处理行的其余部分（如果存在）
         new_line = ''.join(new_line).rstrip()
         if new_line:
-            name, block = parse_yaml_line(new_line)
-            if block:
-                if name in localization_dict.keys():
-                    pass
-                else:
-                    localization_dict[name] = block
+            key, value = parse_yaml_line(new_line)
+            if value:
+                if key not in localization_dict.keys():
+                    localization_dict[key] = value
     return localization_dict
 
 
 def get_localization_dict() -> dict:
     localization_dict = {}
-    localization_paths_list = pp.get_localization_paths()
+    localization_paths_list = pp.get_file_paths('localization')
     for localization_path in localization_paths_list:
         text = rf.read_file_with_encoding(localization_path)
         extract_localization_blocks(text, localization_dict)
@@ -83,13 +97,11 @@ def get_localization_dict() -> dict:
 
 
 def calibrate_localization_dict(localization_dict_used: dict, localization_dict_all: dict):
-    for key, value in localization_dict_used.items():
-        replace_list = LOCALIZATION_REPLACE_PATTERN.findall(value)
-        if replace_list:
-            for replace in replace_list:
-                if replace in localization_dict_all.keys():
-                    value = value.replace(f"${replace}$", localization_dict_all[replace])
-            localization_dict_used[key] = value
+    for key in localization_dict_used:
+        localization_dict_used[key] = LOCALIZATION_REPLACE_PATTERN.sub(
+            lambda match: localization_dict_all.get(match.group(1), match.group(0)),
+            localization_dict_used[key]
+        )
 
 
 # ------------------------------------------------------------------------------------------
@@ -146,10 +158,7 @@ def parse_text_block(start: int, text: str, file_path: str) -> tuple:
                 stack.pop()
                 if not stack:
                     return " " + text[_start + 1:k], k + 1  # 不包括两端的括号
-        if file_path is not None:
-            print(f"错误：花括号不匹配{file_path}")
-        else:
-            print(f"错误：文件花括号不匹配")
+        error.check_bracket(file_path)
         return text[_start + 1:], len_text + 1  # 如果花括号不匹配，输出后面全部的文件
 
     def parse_quotation_mark_content(_start: int) -> tuple:
@@ -157,23 +166,22 @@ def parse_text_block(start: int, text: str, file_path: str) -> tuple:
             if text[k] == '"':
                 return text[_start:k + 1], k + 1  # 包括两端的引号
             elif text[k] == '\n':
-                print("提醒：引号包裹的内容疑似出现跨行，可能导致异常")
-                return text[_start:k], k + 1  # 假定引号内容不会换行
+                _content = text[_start:k]  # 假定引号内容不会换行
+                error.wrong_quotes(file_path, _content)
+                return _content, k + 1
 
     operator, operator_start, operator_end = find_first_operator(text, start)
     len_text = len(text)
     if operator is None:
         remaining = text[start:len_text].strip()
-        if remaining:
-            if file_path is not None:
-                print(f"错误：文件内容异常，{file_path}的{remaining}")
-            else:
-                print(f"错误：文件内容异常，{remaining}")
+        error.check_remaining(file_path, remaining)
         return '', '', len_text + 1
 
     name = text[start:operator_start].strip()
     if re.search(r'\s', name):
         segments = re.split(r'\s+', name)
+        wrong_names = segments[:-1]
+        error.wrong_name(file_path, wrong_names)
         name = segments[-1] if segments else ''
     name += f".[{operator}]" if operator != '=' else ''  # 记录符号，除非是等号
 
@@ -214,22 +222,51 @@ def convert_text_into_dict(text: str, blocks_dict=None, logic_keys_dict=None, ov
         if not key:
             continue
         value = convert_to_number(value)
-        if key in LIST_LOGIC_KEYS:
-            logic_keys_dict[key] += 1
-            key = f"{key}.[{logic_keys_dict[key]}]"
-            blocks_dict[key] = value
-            continue
-        if key not in blocks_dict:
-            blocks_dict[key] = value
-            continue
-        if override:
-            error.duplicate_key(key)
-            blocks_dict[key] = value
-            continue
-        if isinstance(blocks_dict[key], list):
-            blocks_dict[key].append(value)
-            continue
-        blocks_dict[key] = [blocks_dict[key], value]
+        if file_path is not None:
+            if key in LIST_LOGIC_KEYS:
+                logic_keys_dict[key] += 1
+                key = f"{key}.[{logic_keys_dict[key]}]"
+                blocks_dict[key] = {
+                    'info': value,
+                    'path': file_path
+                }
+                continue
+            if key not in blocks_dict:
+                blocks_dict[key] = {
+                    'info': value,
+                    'path': file_path
+                }
+                continue
+            if override:
+                if os.path.dirname(file_path) == os.path.dirname(blocks_dict[key]['path']) and key[0] != '@':
+                    error.duplicate_key(key, os.path.dirname(file_path))
+                blocks_dict[key] = {
+                    'info': value,
+                    'path': file_path
+                }
+                continue
+            if isinstance(blocks_dict[key]['info'], list):
+                blocks_dict[key]['info'].append(value)
+                continue
+            blocks_dict[key]['info'] = [blocks_dict[key]['info'], value]
+        else:
+            if key in LIST_LOGIC_KEYS:
+                logic_keys_dict[key] += 1
+                key = f"{key}.[{logic_keys_dict[key]}]"
+                blocks_dict[key] = value
+                continue
+            if key not in blocks_dict:
+                blocks_dict[key] = value
+                continue
+            if override:
+                if key[0] != '@':
+                    error.duplicate_key(key)
+                blocks_dict[key] = value
+                continue
+            if isinstance(blocks_dict[key], list):
+                blocks_dict[key].append(value)
+                continue
+            blocks_dict[key] = [blocks_dict[key], value]
     return blocks_dict
 
 
@@ -240,14 +277,17 @@ def convert_text_into_dict_from_path(path: str, override=True) -> dict:
     :param override: 重复的value是否覆盖
     :return: block名称和内容的字典
     """
-    list_file_paths = pp.get_file_paths_list(path)  # 获取所有的路径
+    list_file_paths = pp.get_file_paths(path)  # 获取所有的路径
     blocks_dict = {}
     logic_keys_dict = {logic_key: -1 for logic_key in LIST_LOGIC_KEYS}
     for file_path in list_file_paths:  # 对文件分别进行处理，以防止格式错误造成污染
         if not file_path.endswith('.info'):  # 忽略info文件，这个文件的作用类似注释
             text = rf.read_file_with_encoding(file_path)
             convert_text_into_dict(text, blocks_dict, logic_keys_dict, override, file_path)
-    return blocks_dict
+    return {
+        key: blocks_dict[key]['info']
+        for key in blocks_dict
+    }
 
 
 def divide_dict_value(blocks_dict: dict) -> dict:
@@ -300,14 +340,10 @@ def get_nested_dict_from_text(text: str, override=True) -> dict:
 
 # ------------------------------------------------------------------------------------------
 # 以下函数用于解析modifier
-def wrong_format(modifier_name: str):
-    error.can_not_parse(modifier_name)
-
-
-def parse_good_modifier(modifier: str) -> dict | None:
+def parse_good_modifier(modifier: str, *object_names) -> dict | None:
     modifier_match = GOOD_MODIFIER_PATTERN.match(modifier)
     if modifier_match is None:
-        return wrong_format(modifier)
+        return error.can_not_parse(*object_names, modifier)
     else:
         return {
             'category': 'goods',
@@ -333,32 +369,30 @@ def parse_building_modifier(modifier: str) -> dict:  # TODO 这个函数仅能�
         }
 
 
-def parse_modifier(modifier: str) -> dict | None:
+def parse_modifier(*object_names, modifier: str) -> dict | None:
     split_list = modifier.split('_')
     if len(split_list) < 3:  # modifier应该至少3个单位长
-        return wrong_format(modifier)
+        return error.can_not_parse(*object_names, modifier)
 
     match split_list[0]:
         case 'goods':
-            return parse_good_modifier(modifier)
+            return parse_good_modifier(modifier, *object_names)
         case 'building':
             return parse_building_modifier(modifier)
         case 'unit':  # 为了防止报错
             return None
         case _:
-            return wrong_format(modifier)
+            return error.can_not_parse(*object_names, modifier)
 
 
-def parse_modifier_dict(modifier_dict: dict) -> dict:
+def parse_modifier_dict(*object_names, modifier_dict: dict, ) -> dict:
     modifier_info_dict = {}
     for modifier, value in modifier_dict.items():
-        modifier_info = parse_modifier(modifier)
+        modifier_info = parse_modifier(*object_names, modifier=modifier)
         if modifier_info is None:
             continue
-        if not isinstance(value, (int, float)):
-            error.wrong_type(modifier, object_type='数值')
-            continue
-        modifier_info['value'] = value
+        modifier_info['value'] = error.check_attribute_value(
+            *object_names, attribute_value=value, value=0, value_type=(int, float))
         modifier_info_dict[modifier] = modifier_info
     return modifier_info_dict
 
