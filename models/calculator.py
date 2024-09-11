@@ -37,7 +37,7 @@ class Calculator:
             'unlocking_principles': '原则要求'
         }
         self.COLUMN_GOODS = {
-            good: f"{good_info.localization_value}_{good_info.localization_key}"
+            good: f"{good_info.loc_value}_{good_info.loc_key}"
             for good, good_info in self.goods_info.items()
         }
         self.automation_pm_list = building_info_tree_complex.automation_pm_list
@@ -48,7 +48,7 @@ class Calculator:
         combinations = itertools.product(*(node.children for node in building.children))
 
         for combination in combinations:
-            pms_set = {pm.localization_key for pm in combination}
+            pms_set = {pm.loc_key for pm in combination}
             # 检查每个 pm 的 unlocking_production_methods 是否与 pms_set 有交集，除非它是空集
             can_generate_data = all(
                 pm.unlocking_production_methods == [] or set(pm.unlocking_production_methods) & pms_set
@@ -56,7 +56,7 @@ class Calculator:
             )
 
             if can_generate_data:
-                pmgs_list = [pmg.localization_key for pmg in building.children]  # 这里使用localization_key防止重复
+                pmgs_list = [pmg.loc_key for pmg in building.children]  # 这里使用localization_key防止重复
                 one_line_data = self.__generate_one_line_data(dict(zip(pmgs_list, combination)), building)
                 one_line_data = self.__calculate_data(one_line_data, building)
                 one_line_data_list.append(one_line_data)
@@ -115,7 +115,7 @@ class Calculator:
             workforce.update(pm.workforce)
             subsistence_output += pm.subsistence_output
 
-            one_line_data['pm_data'][pmg] = pm.localization_value
+            one_line_data['pm_data'][pmg] = pm.loc_value
             for tech in pm.unlocking_technologies:
                 if tech.era > era:
                     era = tech.era
@@ -139,16 +139,16 @@ class Calculator:
 
         one_line_data['other_data'] = {
             'era': era,
-            'highest_tech': ' '.join([tech.localization_value for tech in highest_tech]),
-            'techs_all': ' '.join([tech.localization_value for tech in techs_all]),
-            'unlocking_principles': ' '.join([principle.localization_value for principle in unlocking_principles]),
-            'unlocking_identity': ' '.join([identity.localization_value for identity in unlocking_identity]),
-            'unlocking_laws': ' '.join([law.localization_value for law in unlocking_laws]),
-            'disallowing_laws': ' '.join([law.localization_value for law in disallowing_laws])
+            'highest_tech': ' '.join([tech.loc_value for tech in highest_tech]),
+            'techs_all': ' '.join([tech.loc_value for tech in techs_all]),
+            'unlocking_principles': ' '.join([principle.loc_value for principle in unlocking_principles]),
+            'unlocking_identity': ' '.join([identity.loc_value for identity in unlocking_identity]),
+            'unlocking_laws': ' '.join([law.loc_value for law in unlocking_laws]),
+            'disallowing_laws': ' '.join([law.loc_value for law in disallowing_laws])
         }
 
         one_line_data['goods_data'] = {
-            good_info.localization_key:
+            good_info.loc_key:
                 one_line_data['raw_data']['goods_output'].get(good, 0)
                 - one_line_data['raw_data']['goods_input'].get(good, 0)
             for good, good_info in self.goods_info.items()
@@ -192,10 +192,10 @@ class Calculator:
                 self.building_info_tree]
 
     def __transfer_dict_to_df(self, one_line_data_list, building):
-        name = (f"{building.building_group_display.localization_value}"
-                f"_{building.localization_value}_{building.localization_key}.xlsx")
+        name = (f"{building.building_group_display.loc_value}"
+                f"_{building.loc_value}_{building.loc_key}.xlsx")
         name = error.check_filename(name)
-        column_pmg = {pmg.localization_key: f"{pmg.localization_value}_{pmg.localization_key}"
+        column_pmg = {pmg.loc_key: f"{pmg.loc_value}_{pmg.loc_key}"
                       for pmg in building.children}
         colum_rename = column_pmg | self.COLUMN_HEADERS | self.COLUMN_GOODS
         rows = []
@@ -211,8 +211,8 @@ class Calculator:
         building_info_df = pd.DataFrame(rows)
 
         for good_info in self.goods_info.values():
-            if (building_info_df[good_info.localization_key] == 0).all():
-                building_info_df.drop(good_info.localization_key, axis=1, inplace=True)
+            if (building_info_df[good_info.loc_key] == 0).all():
+                building_info_df.drop(good_info.loc_key, axis=1, inplace=True)
         for key in list(self.COLUMN_HEADERS.keys())[9:]:
             if (building_info_df[key] == '').all():
                 building_info_df.drop(key, axis=1, inplace=True)
@@ -254,8 +254,8 @@ class Calculator:
                         pm_list.remove(automation_pm)
                         pm_list.insert(2, automation_pm)
                 pm_data = {column_4pm[i]: pm_list[i] for i in range(len(column_4pm))}
-                row = {'建筑组': building.building_group_display.localization_value} | {
-                    '建筑': building.localization_value} | pm_data | one_line_data['processed_data'] | one_line_data[
+                row = {'建筑组': building.building_group_display.loc_value} | {
+                    '建筑': building.loc_value} | pm_data | one_line_data['processed_data'] | one_line_data[
                           'other_data'] | one_line_data['goods_data']
                 rows.append(row)
         summary_table_df = pd.DataFrame(rows)

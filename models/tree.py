@@ -9,8 +9,8 @@ import constants.str as s
 import models.model as mm
 
 NULL_BUILDING_GROUP = mm.BuildingGroupNode(  # 用于处理缺失建筑组的建筑
-    localization_key='Null',
-    localization_value='Null',
+    loc_key='Null',
+    loc_value='Null',
     parent_group=[]
 )
 
@@ -66,8 +66,8 @@ class BuildingInfoTree:
 
         return {
             building_group: mm.BuildingGroupNode(
-                localization_key=building_group,
-                localization_value=self.localization_info.get(building_group, building_group),
+                loc_key=building_group,
+                loc_value=self.localization_info.get(building_group, building_group),
                 parent_group=get_parent_groups_list(building_group, extend_building_groups_dict)
             )
             for building_group in extend_building_groups_dict
@@ -85,8 +85,8 @@ class BuildingInfoTree:
     def __get_goods_info(self, good_blocks_dict) -> dict:
         return {
             good: mm.GoodNode(
-                localization_key=good,
-                localization_value=self.localization_info[good],
+                loc_key=good,
+                loc_value=self.localization_info[good],
                 cost=error.get_attribute(good, good_blocks_dict, s.COST, 0, (int, float)) * GOODS_COST_OFFSET.get(good,
                                                                                                                   1.0)
             )
@@ -96,8 +96,8 @@ class BuildingInfoTree:
     def __get_pops_info(self, pop_blocks_dict) -> dict:
         return {
             pop_type: mm.POPTypeNode(
-                localization_key=pop_type,
-                localization_value=self.localization_info[pop_type],
+                loc_key=pop_type,
+                loc_value=self.localization_info[pop_type],
                 wage_weight=error.get_attribute(pop_type, pop_blocks_dict, s.WAGE_WEIGHT, 0, (int, float)),
                 subsistence_income=error.has_attribute(pop_type, pop_blocks_dict, s.SUBSISTENCE_INCOME, False)
             )
@@ -246,8 +246,8 @@ class BuildingInfoTree:
         for building, building_info in self.buildings_info.items():
             building_group, building_group_display = self.parse_building_group(self.buildings_info[building]['bg'])
             buildings_list.append(mm.BuildingNode(
-                localization_key=building,
-                localization_value=self.localization_info[building],
+                loc_key=building,
+                loc_value=self.localization_info[building],
                 children=self.parse_pmgs(building_info['pmgs']),
                 required_construction=building_info['cost'],
                 building_group=building_group,
@@ -273,8 +273,8 @@ class BuildingInfoTree:
         for pmg in pmgs:
             if pmg in self.pmgs_info:
                 pmgs_list.append(mm.NormalNode(
-                    localization_key=pmg,
-                    localization_value=self.localization_info[pmg],
+                    loc_key=pmg,
+                    loc_value=self.localization_info[pmg],
                     children=self.parse_pms(self.pmgs_info[pmg])
                 ))
             else:
@@ -287,8 +287,8 @@ class BuildingInfoTree:
         for pm in pms:
             if pm in self.pms_info:
                 pms_list.append(mm.PMNode(
-                    localization_key=pm,
-                    localization_value=self.localization_info[pm],
+                    loc_key=pm,
+                    loc_value=self.localization_info[pm],
                     unlocking_technologies=self.parse_tech(self.pms_info[pm][s.UNLOCKING_TECHNOLOGIES]),
                     unlocking_production_methods=self.pms_info[pm][s.UNLOCKING_PRODUCTION_METHODS],
                     unlocking_principles=self.parse_names_list(self.pms_info[pm][s.UNLOCKING_PRINCIPLES],
@@ -310,8 +310,8 @@ class BuildingInfoTree:
         for tech in techs:
             if tech in self.technologies_info:
                 techs_list.append(mm.TechNode(
-                    localization_key=tech,
-                    localization_value=self.localization_info[tech],
+                    loc_key=tech,
+                    loc_value=self.localization_info[tech],
                     era=self.technologies_info[tech],
                 ))
             else:
@@ -323,8 +323,8 @@ class BuildingInfoTree:
         for _object in objects:
             if _object in info:
                 objects_list.append(mm.Name(
-                    localization_key=_object,
-                    localization_value=self.localization_info[_object]
+                    loc_key=_object,
+                    loc_value=self.localization_info[_object]
                 ))
             else:
                 error.lack_definition(_object)
@@ -335,8 +335,8 @@ class BuildingInfoTree:
             return None
         if game_object in info:
             return mm.Name(
-                localization_key=game_object,
-                localization_value=self.localization_info[game_object]
+                loc_key=game_object,
+                loc_value=self.localization_info[game_object]
             )
         else:
             error.lack_definition(game_object)

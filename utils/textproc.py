@@ -7,6 +7,7 @@ import utils.pathproc as pp
 import utils.error as error
 import utils.read_file as rf
 from utils.config import LOCALIZATION
+from models.model import RawGameObject
 
 # 正则表达式
 OPERATOR_PATTERN = re.compile(r"(!=|\?=|<=|<|=|>=|>)")
@@ -135,7 +136,7 @@ def convert_to_number(value: str) -> int | float | str:
         return value
 
 
-def parse_text_block(start: int, text: str, file_path: str) -> tuple:
+def parse_text_block(start: int, text: str, file_path=None) -> tuple:
     """
     解析文本的一个block，返回block名称、内容和新的起始位置
     :param text: 待处理文本
@@ -161,7 +162,7 @@ def parse_text_block(start: int, text: str, file_path: str) -> tuple:
         error.check_bracket(file_path)
         return text[_start + 1:], len_text + 1  # 如果花括号不匹配，输出后面全部的文件
 
-    def parse_quotation_mark_content(_start: int) -> tuple:
+    def parse_quote_content(_start: int) -> tuple:  # TODO 这个函数可以强化
         for k in range(_start + 1, len_text):  # 跳过第一个引号，只需要知道第二个引号的位置
             if text[k] == '"':
                 return text[_start:k + 1], k + 1  # 包括两端的引号
@@ -199,7 +200,7 @@ def parse_text_block(start: int, text: str, file_path: str) -> tuple:
         name += f".[{text[first_non_space_start:bracket_start]}]" if text[first_non_space_start:bracket_start] else ''
         return name, *parse_bracket_content(bracket_start)
     if first_non_space.group()[0] == '"':
-        return name, *parse_quotation_mark_content(first_non_space_start)
+        return name, *parse_quote_content(first_non_space_start)
     second_non_space = re.search(r"\S+", text[first_non_space_end:len_text])
     if second_non_space is None:
         return name, first_non_space.group(), len_text + 1
@@ -210,7 +211,14 @@ def parse_text_block(start: int, text: str, file_path: str) -> tuple:
     return name, first_non_space.group(), second_non_space_start
 
 
-def convert_text_into_dict(text: str, blocks_dict=None, logic_keys_dict=None, override=True, file_path=None) -> dict:
+def convert_text_into_game_object_dict(text: str, blocks_dict, logic_keys_dict, file_path, override=True) -> dict:
+    def add_raw_game_object_to_dict():
+        blocks_dict[key] = RawGameObject(
+            loc_key=key,
+            info=value,
+            path=file_path if file_path is not None else ''
+        )
+
     if blocks_dict is None:
         blocks_dict = {}
     if logic_keys_dict is None:
@@ -222,55 +230,51 @@ def convert_text_into_dict(text: str, blocks_dict=None, logic_keys_dict=None, ov
         if not key:
             continue
         value = convert_to_number(value)
-        if file_path is not None:
-            if key in LIST_LOGIC_KEYS:
-                logic_keys_dict[key] += 1
-                key = f"{key}.[{logic_keys_dict[key]}]"
-                blocks_dict[key] = {
-                    'info': value,
-                    'path': file_path
-                }
-                continue
-            if key not in blocks_dict:
-                blocks_dict[key] = {
-                    'info': value,
-                    'path': file_path
-                }
-                continue
-            if override:
-                if os.path.dirname(file_path) == os.path.dirname(blocks_dict[key]['path']) and key[0] != '@':
+        if key in LIST_LOGIC_KEYS:
+            logic_keys_dict[key] += 1
+            key = f"{key}.[{logic_keys_dict[key]}]"
+            add_raw_game_object_to_dict()
+            continue
+        if key not in blocks_dict:
+            add_raw_game_object_to_dict()
+            continue
+        if override:
+            if file_path is not None:
+                if os.path.dirname(file_path) == os.path.dirname(blocks_dict[key].path) and key[0] != '@':
                     error.duplicate_key(key, os.path.dirname(file_path))
-                blocks_dict[key] = {
-                    'info': value,
-                    'path': file_path
-                }
-                continue
-            if isinstance(blocks_dict[key]['info'], list):
-                blocks_dict[key]['info'].append(value)
-                continue
-            blocks_dict[key]['info'] = [blocks_dict[key]['info'], value]
-        else:
-            if key in LIST_LOGIC_KEYS:
-                logic_keys_dict[key] += 1
-                key = f"{key}.[{logic_keys_dict[key]}]"
-                blocks_dict[key] = value
-                continue
-            if key not in blocks_dict:
-                blocks_dict[key] = value
-                continue
-            if override:
-                if key[0] != '@':
-                    error.duplicate_key(key)
-                blocks_dict[key] = value
-                continue
-            if isinstance(blocks_dict[key], list):
-                blocks_dict[key].append(value)
-                continue
-            blocks_dict[key] = [blocks_dict[key], value]
+            add_raw_game_object_to_dict()
+            continue
+        if isinstance(blocks_dict[key].info, list):
+            blocks_dict[key].info.append(value)
+            continue
+        blocks_dict[key].info = [blocks_dict[key].info, value]
     return blocks_dict
 
 
-def convert_text_into_dict_from_path(path: str, override=True) -> dict:
+def convert_info_block_into_dict(text: str) -> dict:
+    blocks_dict = {}
+    logic_keys_dict = {logic_key: -1 for logic_key in LIST_LOGIC_KEYS}
+    start = 0
+    while start < len(text):
+        key, value, start = parse_text_block(start, text)
+        if not key:
+            continue
+        value = convert_to_number(value)
+        if key in LIST_LOGIC_KEYS:
+            logic_keys_dict[key] += 1
+            key = f"{key}.[{logic_keys_dict[key]}]"
+            blocks_dict[key] = value
+            continue
+        if key not in blocks_dict:
+            blocks_dict[key] = value
+            continue
+        blocks_dict[key] = [blocks_dict[key], value] \
+            if not isinstance(blocks_dict[key], list) \
+            else blocks_dict[key] + [value]
+    return blocks_dict
+
+
+def convert_path_to_game_objects_dict(path: str, override=True) -> dict:
     """
     将文本分割成不同的部分，并存储在字典中
     :param path: 待处理的路径
@@ -278,26 +282,21 @@ def convert_text_into_dict_from_path(path: str, override=True) -> dict:
     :return: block名称和内容的字典
     """
     list_file_paths = pp.get_file_paths(path)  # 获取所有的路径
-    blocks_dict = {}
+    game_objects_dict = {}
     logic_keys_dict = {logic_key: -1 for logic_key in LIST_LOGIC_KEYS}
     for file_path in list_file_paths:  # 对文件分别进行处理，以防止格式错误造成污染
         if not file_path.endswith('.info'):  # 忽略info文件，这个文件的作用类似注释
             text = rf.read_file_with_encoding(file_path)
-            convert_text_into_dict(text, blocks_dict, logic_keys_dict, override, file_path)
-    return {
-        key: blocks_dict[key]['info']
-        for key in blocks_dict
-    }
+            convert_text_into_game_object_dict(text, game_objects_dict, logic_keys_dict, file_path, override)
+    return game_objects_dict
 
 
-def divide_dict_value(blocks_dict: dict) -> dict:
+def parse_value(value):
     """
-    递归函数，进一步对dict的value进行解析
-    :param blocks_dict: 待解析的dict
-    :return: 递归解析后的dict
+    递归函数，对value进行解析
     """
 
-    def process_content(content) -> str | list | dict:
+    def analyze_content(content):
         """
         处理字符串内容，递归解析或分割为列表
         """
@@ -306,18 +305,20 @@ def divide_dict_value(blocks_dict: dict) -> dict:
         if content[0] in ['"', '@']:
             return content
         if any(op in content for op in ('<', '=', '>')):  # 这里通过这三个符号判断是否能够进一步解析
-            return get_nested_dict_from_text(content, override=False)
-        match_whitespace = re.search(r"\s", content)
-        if match_whitespace is None:
+            attribute_dict = convert_info_block_into_dict(content)
+            return {item: parse_value(attribute_dict[item]) for item in attribute_dict}
+        if re.search(r"\s", content) is None:
             return content
         return [convert_to_number(item) for item in re.findall(r"\S+", content)]
 
-    for key, value in blocks_dict.items():
-        if isinstance(value, str):
-            blocks_dict[key] = process_content(value)
-        elif isinstance(value, list):
-            blocks_dict[key] = [process_content(item) if isinstance(item, str) else item for item in value]
-    return blocks_dict
+    if isinstance(value, str):
+        return analyze_content(value)
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, list):
+        return [parse_value(item) for item in value]
+    print(f"错误：parse_value，{value}")
+    return {}
 
 
 def get_nested_dict_from_path(path: str, override=True) -> dict:
@@ -327,14 +328,9 @@ def get_nested_dict_from_path(path: str, override=True) -> dict:
     :param override: 新值是否覆盖旧值
     :return: 嵌套字典
     """
-    nested_dict = convert_text_into_dict_from_path(path, override)
-    nested_dict = divide_dict_value(nested_dict)
-    return nested_dict
-
-
-def get_nested_dict_from_text(text: str, override=True) -> dict:
-    nested_dict = convert_text_into_dict(text, override=override)
-    nested_dict = divide_dict_value(nested_dict)
+    nested_dict = convert_path_to_game_objects_dict(path, override)
+    for game_object in nested_dict.values():
+        game_object.info = parse_value(game_object.info)
     return nested_dict
 
 

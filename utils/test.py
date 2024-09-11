@@ -46,6 +46,13 @@ def txt_combiner_from_one_folder(path: str) -> str:
     return content
 
 
+def simplify_game_objects_dict(complex_dict: dict) -> dict:
+    return {
+        key: complex_dict[key].info
+        for key in complex_dict
+    }
+
+
 # ------------------------------------------------------------------------------------------
 # 以下为开发中函数
 def find_value(value_0, dict_0: dict):

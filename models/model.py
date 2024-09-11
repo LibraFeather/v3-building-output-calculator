@@ -2,12 +2,20 @@
 数据储存类
 """
 from dataclasses import dataclass
+from typing import Any
+
+
+@dataclass
+class RawGameObject:
+    loc_key: str
+    info: Any
+    path: str
 
 
 @dataclass
 class Name:
-    localization_key: str
-    localization_value: str
+    loc_key: str
+    loc_value: str
 
 
 @dataclass
