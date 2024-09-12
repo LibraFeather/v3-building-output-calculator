@@ -20,11 +20,13 @@ else:
 
 
 # ------------------------------------------------------------------------------------------
-def assumption_value(error_info: str, value):
-    if value is None:
-        print(error_info)
-    else:
-        print(error_info + f"，因此假定为{value}")
+def assumption_value(error_info: str, value, show_error=True):
+    if show_error:
+        if value is None:
+            print(error_info)
+        else:
+            print(error_info + f"，因此假定为{value}")
+    return value
 
 
 def merge_game_objects(object_names) -> str:
@@ -102,16 +104,17 @@ def lack_definition(*object_names: str, value=None):
     object_name = merge_game_objects(object_names)
     error_info = f"错误：对象无定义，{object_name}"
     assumption_value(error_info, value)
+    return value
 
 
-def lack_attribute(*object_names, attribute: str, value=None):
+def lack_attribute(*object_names, attribute: str, value=None, show_error=False):
     object_name = merge_game_objects(object_names)
     error_info = f"错误：对象属性缺失，{object_name}.{attribute}"
-    assumption_value(error_info, value)
+    return assumption_value(error_info, value, show_error)
 
 
-def lack_localization(object_name: str):
-    if SHOW_LACK_LOCALIZATION_WARNING:
+def lack_localization(object_name: str, show_error=True):
+    if SHOW_LACK_LOCALIZATION_WARNING and show_error:
         print(f"提醒：对象本地化缺失，{object_name}")
 
 
@@ -134,15 +137,19 @@ def check_filename(filename):
         return filename
 
 
-def check_objects_dict(objects_dict: dict, object_type: str) -> dict:
-    processed_objects_dict = {}
-    for game_object, game_object_info in objects_dict.items():
-        if not isinstance(game_object_info, dict):
-            if game_object[0] != "@":
-                print(f"错误：文件格式错误，{object_type}的{game_object}")
+def check_objects_dict(objs: dict, obj_type: str) -> dict:
+    valid_objs = {}
+    for obj, obj_info in objs.items():
+        if not isinstance(obj_info.block, dict):
+            if obj[0] != "@":
+                print(f"错误：文件格式错误，{obj_type}.{obj}")
         else:
-            processed_objects_dict[game_object] = game_object_info
-    return processed_objects_dict
+            valid_objs[obj] = obj_info
+    return valid_objs
+
+
+def check_parent_group(bg_info):
+    print(f"错误：建筑组无限递归，{bg_info.obj_type}.{bg_info.loc_key}")
 
 
 def duplicate_key(key: str, path=None):
@@ -170,48 +177,69 @@ def is_subpath(parent_path, child_path):
 
 
 # ------------------------------------------------------------------------------------------
-def get_attribute(object_name: str, object_blocks_dict: dict, attribute: str, value, value_type, show_error=True):
-    if attribute not in object_blocks_dict[object_name]:
+def get_attribute(obj_info, attribute: str, value, value_type, show_error=True):
+    if attribute not in obj_info.block:
         if show_error:
-            lack_attribute(object_name, attribute=attribute)
+            lack_attribute(obj_info.obj_type, obj_info.loc_key, attribute=attribute)
         return value
-    attribute_value = object_blocks_dict[object_name][attribute]
-    return check_attribute_value(object_name, attribute,
-                                 attribute_value=attribute_value, value=value, value_type=value_type)
+    attribute_value = obj_info.block[attribute]
+    return check_attribute_value(obj_info.obj_type, obj_info.loc_key, attribute,
+                                 attribute_value=attribute_value, value=value, value_type=value_type,
+                                 show_error=show_error)
 
 
-def check_attribute_value(*object_names, attribute_value, value, value_type):
+def check_attribute_value(*object_names, attribute_value, value, value_type, show_error=True):
     object_name = merge_game_objects(object_names)
     if isinstance(attribute_value, value_type):
         return attribute_value
     if not attribute_value:
         error_info = f"错误：属性的值为空，{object_name}"
-        assumption_value(error_info, value)
-        return value
+        return assumption_value(error_info, value, show_error)
     if isinstance(attribute_value, list):
         value = check_attribute_value(
             *object_names, attribute_value=attribute_value[-1], value=0, value_type=value_type)
         error_info = f"错误：属性多次赋值，{object_name}"
-        assumption_value(error_info, value)
-        return value
+        return assumption_value(error_info, value)
     wrong_type(*object_names, attribute_value, object_type=value_type)
     return value
 
 
-def has_attribute(object_name: str, object_blocks_dict: dict, attribute: str, show_error=True) -> bool:
-    if attribute in object_blocks_dict[object_name]:
+def check_modifier_dict_value(obj_info) -> dict:
+    modifier_dict = {}
+    for key, value in obj_info.block.items():
+        if isinstance(value, (int, float)):
+            modifier_dict[key] = value
+        elif isinstance(value, list):
+            total = 0
+            all_numeric = True
+            for item in value:
+                if isinstance(item, (int | float)):
+                    total += item
+                else:
+                    print(f"错误：修正的值异常，{obj_info.obj_type}.{obj_info.loc_key}.{key}.{item}")
+                    all_numeric = False
+            if all_numeric:
+                print(f"提醒：修正可合并，{obj_info.obj_type}.{obj_info.loc_key}.{key}")
+            modifier_dict[key] = total
+        else:
+            error_info = f"错误：修正的值异常，{obj_info.obj_type}.{obj_info.loc_key}.{key}.{value}"
+            modifier_dict[key] = assumption_value(error_info, 0)
+    return modifier_dict
+
+
+def has_attribute(obj_info, attribute: str, show_error=True) -> bool:  # TODO 函数行为待进一步确认
+    if attribute in obj_info.block:
         return True
     else:
-        if show_error:
-            lack_attribute(object_name, attribute=attribute)
-        return False
+        return lack_attribute(obj_info.obj_type, obj_info.loc_key, attribute=attribute,
+                              value=False, show_error=show_error)
 
 
-def get_localization(key: str, localization_dict: dict) -> str:
-    if key in localization_dict:
-        return localization_dict[key]
+def get_localization(key: str, loc_dict: dict, show_error=True) -> str:
+    if key in loc_dict:
+        return loc_dict[key]
     else:
-        lack_localization(key)
+        lack_localization(key, show_error)
         return key
 
 
@@ -247,23 +275,23 @@ def get_era_num(era, tech: str) -> int:
         wrong_type(tech, era, object_type=int)
 
 
-def process_principle(principle_keys: list, localization_dict_used: dict, localization_dict_all: dict):
-    for principle_key in principle_keys:
-        principle_match = re.search(r"principle_(?P<name>[\w\-]+?)_(?P<value>\d+)", principle_key)
+def localize_principle(local_loc_dict: dict, principles: list, global_loc_dict: dict):
+    for principle in principles:
+        principle_match = re.search(r"principle_(?P<name>[\w\-]+?)_(?P<value>\d+)", principle)
         if principle_match is None:
-            localization_dict_used[principle_keys] = principle_key
+            local_loc_dict[principles] = principle
             continue
-        principle_group_key = 'principle_group_' + principle_match.group('name')
-        if principle_group_key in localization_dict_all:
-            localization_dict_used[principle_key] = (localization_dict_all[principle_group_key]
-                                                     + principle_match.group('value'))
+        principle_group = 'principle_group_' + principle_match.group('name')
+        if principle_group in global_loc_dict:
+            local_loc_dict[principle] = (global_loc_dict[principle_group]
+                                         + principle_match.group('value'))
         else:
-            lack_localization(principle_group_key)
-            localization_dict_used[principle_key] = principle_key
+            lack_localization(principle_group)
+            local_loc_dict[principle] = principle
 
 
-def process_long_building_name(buildings: list, localization_dict_used: dict):
+def check_long_building_name(loc_dict: dict, buildings: list):
     for building in buildings:  # dummy building的本地化值过长，需要被替换，这里用本地化值的长度作为依据
-        if len(localization_dict_used[building]) > 50:
+        if len(loc_dict[building]) > 50:
             print(f"提醒：本地化值过长，{building}，因此被dummy代替")
-            localization_dict_used[building] = 'dummy'
+            loc_dict[building] = 'dummy'

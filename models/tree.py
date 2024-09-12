@@ -2,128 +2,89 @@
 树生成类
 """
 import utils.textproc as tp
-import utils.game_data_mapper as ptd
+import utils.game_data_mapper as gdm
 import utils.error as error
 from utils.config import GOODS_COST_OFFSET
 import constants.str as s
 import models.model as mm
+import utils.obj as obj
 
-NULL_BUILDING_GROUP = mm.BuildingGroupNode(  # 用于处理缺失建筑组的建筑
+NULL_BUILDING_GROUP = mm.BuildingGroup(  # 用于处理缺失建筑组的建筑
     loc_key='Null',
     loc_value='Null',
-    parent_group=[]
+    parent_group='',
+    path='',
+    obj_type=''
 )
+
+
+class GameObjectBuilder:
+    def __init__(self):
+        local_obj_types = ['buildings', 'building_groups', 'goods', 'laws', 'pop_types', 'power_bloc_identities',
+                           'power_bloc_principles', 'production_method_groups', 'production_methods', 'script_values',
+                           'technologies']
+        obj_types_dict = gdm.get_obj_types_dict(local_obj_types)
+        for obj_types in obj_types_dict:
+            if obj_types != 'script_values':
+                obj_types_dict[obj_types] = error.check_objects_dict(obj_types_dict[obj_types], obj_types)
+
+        self.loc = obj.get_loc(obj_types_dict)
+
+        self.scrit_values = obj.get_scrit_values(obj_types_dict['script_values'])
+        self.building_groups = obj.get_building_groups(obj_types_dict['building_groups'], self.loc)
+        self.buildings = obj.get_buildings(obj_types_dict['buildings'], self.loc)
+        self.goods = obj.get_goods(obj_types_dict['goods'], self.loc)
+        self.laws = obj.get_obj(obj_types_dict['laws'], self.loc)
+        self.pop_types = obj.get_pops(obj_types_dict['pop_types'], self.loc)
+        self.identities = obj.get_obj(obj_types_dict['power_bloc_identities'], self.loc)
+        self.principles = obj.get_obj(obj_types_dict['power_bloc_principles'], self.loc)
+        self.pmgs = obj.get_pmgs(obj_types_dict['production_method_groups'], self.loc)
+        self.pms = obj.get_pms(obj_types_dict['production_methods'], self.loc)
+        self.technologies = obj.get_technologies(obj_types_dict['technologies'], self.loc)
+
+    def get_building_groups_chain(self, bg: str):
+        bg_chain = [bg]
+        if bg not in self.building_groups:
+            return error.lack_definition('building_groups', bg, value=bg_chain)
+        while self.building_groups[bg].parent_group:
+            bg = self.building_groups[bg].parent_group
+            if bg in bg_chain:
+                error.check_parent_group(self.building_groups[bg])
+                return bg_chain
+            bg_chain.append(bg)
+        return bg_chain
 
 
 class BuildingInfoTree:
     def __init__(self):
-        game_objet_need = ['buildings', 'building_groups', 'goods', 'laws', 'pop_types', 'power_bloc_identities',
-                           'power_bloc_principles',
-                           'production_method_groups', 'production_methods', 'script_values', 'technologies']
-        game_object_dict = ptd.get_game_object_dict(game_objet_need)
-        for game_object in game_object_dict:
-            if game_object != 'script_values':
-                game_object_dict[game_object] = error.check_objects_dict(game_object_dict[game_object], game_object)
-
-        self.localization_info = self.__get_localization_info(game_object_dict)
-
-        self.scrit_values_info = game_object_dict['script_values']
-        self.building_groups_info = self.__get_building_groups_info(game_object_dict['building_groups'])
-        self.buildings_info = self.__get_buildings_info(game_object_dict['buildings'])
-        self.goods_info = self.__get_goods_info(game_object_dict['goods'])
-        self.laws_info = game_object_dict['laws']
-        self.pop_types_info = self.__get_pops_info(game_object_dict['pop_types'])
-        self.identities_info = game_object_dict['power_bloc_identities']
-        self.principles_info = game_object_dict['power_bloc_principles']
-        self.pmgs_info = self.__get_pmgs_info(game_object_dict['production_method_groups'])
-        self.pms_info = self.__get_pms_info(game_object_dict['production_methods'])
-        self.technologies_info = self.__get_technologies_info(game_object_dict['technologies'])
+        gob = GameObjectBuilder()
+        self.scrit_values_info = gob.scrit_values
+        self.building_groups_info = gob.building_groups
+        self.buildings_info = gob.buildings
+        self.goods_info = gob.goods
+        self.laws_info = gob.laws
+        self.pop_types_info = gob.pop_types
+        self.identities_info = gob.identities
+        self.principles_info = gob.principles
+        self.pmgs_info = gob.pmgs
+        self.pms_info = gob.pms
+        self.technologies_info = gob.technologies
 
         self.automation_pm_list = self.__get_automation_pm_list()
 
         self.tree = self.generate_tree()
 
-    def __get_building_groups_info(self, building_groups_blocks_dict) -> dict:
-        def get_parent_groups_list(_building_group: str, _building_groups_blocks_dict: dict) -> list:
-            _parent_group = _building_groups_blocks_dict[_building_group]
-            parent_groups_list = [_building_group]
-            while _parent_group:
-                parent_groups_list.append(_parent_group)
-                _parent_group = _building_groups_blocks_dict[_parent_group]
-            return parent_groups_list
-
-        building_groups_dict = {
-            building_group: error.get_attribute(building_group, building_groups_blocks_dict, s.PARENT_GROUP, '',
-                                                str, False)
-            for building_group in building_groups_blocks_dict
-        }
-
-        extend_building_groups_dict = building_groups_dict.copy()
-        for parent_group in building_groups_dict.values():  # 把不存在的父建筑组加上
-            if parent_group not in extend_building_groups_dict and parent_group:
-                error.lack_definition(parent_group)
-                extend_building_groups_dict[parent_group] = ''
-
-        return {
-            building_group: mm.BuildingGroupNode(
-                loc_key=building_group,
-                loc_value=self.localization_info.get(building_group, building_group),
-                parent_group=get_parent_groups_list(building_group, extend_building_groups_dict)
-            )
-            for building_group in extend_building_groups_dict
-        }
-
-    @staticmethod
-    def __get_technologies_info(technology_blocks_dict) -> dict:
-        return {
-            technology: error.get_era_num(error.get_attribute(technology, technology_blocks_dict, s.ERA, 0, str),
-                                          technology)
-            for technology in technology_blocks_dict
-        }
-
-    # ! 预备部分，创建各项存储字典
-    def __get_goods_info(self, good_blocks_dict) -> dict:
-        return {
-            good: mm.GoodNode(
-                loc_key=good,
-                loc_value=self.localization_info[good],
-                cost=error.get_attribute(good, good_blocks_dict, s.COST, 0, (int, float)) * GOODS_COST_OFFSET.get(good,
-                                                                                                                  1.0)
-            )
-            for good in good_blocks_dict
-        }
-
-    def __get_pops_info(self, pop_blocks_dict) -> dict:
-        return {
-            pop_type: mm.POPTypeNode(
-                loc_key=pop_type,
-                loc_value=self.localization_info[pop_type],
-                wage_weight=error.get_attribute(pop_type, pop_blocks_dict, s.WAGE_WEIGHT, 0, (int, float)),
-                subsistence_income=error.has_attribute(pop_type, pop_blocks_dict, s.SUBSISTENCE_INCOME, False)
-            )
-            for pop_type in pop_blocks_dict
-        }
-
-    def __get_buildings_info(self, building_blocks_dict) -> dict:
-        return {
-            building: {
-                'cost': error.find_numeric_value(error.get_attribute(building, building_blocks_dict,
-                                                                     s.REQUIRED_CONSTRUCTION, 0,
-                                                                     (int, float, str), False),
-                                                 self.scrit_values_info),
-                'pmgs': error.get_attribute(building, building_blocks_dict, s.PRODUCTION_METHOD_GROUPS, [], list),
-                'bg': error.get_attribute(building, building_blocks_dict, s.BUILDING_GROUP, '', str),
-                'unlocking_technologies': building_blocks_dict[building].get(s.UNLOCKING_TECHNOLOGIES, [])
-            }
-            for building in building_blocks_dict if isinstance(building_blocks_dict[building], dict)
-        }
-
-    @staticmethod
-    def __get_pmgs_info(pmg_blocks_dict) -> dict:
-        return {
-            pmg: error.get_attribute(pmg, pmg_blocks_dict, s.PRODUCTION_METHODS, [], list, True)
-            for pmg in pmg_blocks_dict
-        }
+    def __get_building_groups_chain(self, bg: str):
+        bg_chain = [bg]
+        if bg not in self.building_groups_info:
+            return error.lack_definition('building_groups', bg, value=bg_chain)
+        while self.building_groups_info[bg].parent_group:
+            bg = self.building_groups_info[bg].parent_group
+            if bg in bg_chain:
+                error.check_parent_group(self.building_groups_info[bg])
+                return bg_chain
+            bg_chain.append(bg)
+        return bg_chain
 
     def __get_pms_info(self, pm_blocks_dict) -> dict:
         def update_pms_dict(_pm: str, attribute: str):
@@ -204,32 +165,6 @@ class BuildingInfoTree:
                 update_pms_dict(pm, s.UNSCALED)
 
         return pms_dict
-
-    @staticmethod
-    def __get_localization_info(game_object_dict) -> dict:
-        localization_dict_all = tp.get_localization_dict()
-        localization_dict_used = {}
-
-        game_object_list_dict = {game_object: list(game_object_dict[game_object].keys()) for game_object in
-                                 game_object_dict}
-
-        localization_keys_used = [
-            key for game_object in game_object_list_dict
-            if game_object not in ['script_values', 'power_bloc_principles']
-            for key in game_object_list_dict[game_object]
-        ]
-
-        error.process_principle(game_object_list_dict['power_bloc_principles'],
-                                localization_dict_used, localization_dict_all)  # 单独处理原则
-
-        for key in localization_keys_used:
-            localization_dict_used[key] = error.get_localization(key, localization_dict_all)
-
-        tp.calibrate_localization_dict(localization_dict_used, localization_dict_all)  # 替换字典中的$<字符>$
-
-        error.process_long_building_name(game_object_list_dict['buildings'], localization_dict_used)  # 处理过长的建筑名称
-
-        return localization_dict_used
 
     def __get_automation_pm_list(self):
         return [pm for pmg, pm_list in self.pmgs_info.items() if self.localization_info[pmg] == '自动化' for pm in

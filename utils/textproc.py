@@ -97,11 +97,11 @@ def get_localization_dict() -> dict:
     return localization_dict
 
 
-def calibrate_localization_dict(localization_dict_used: dict, localization_dict_all: dict):
-    for key in localization_dict_used:
-        localization_dict_used[key] = LOCALIZATION_REPLACE_PATTERN.sub(
-            lambda match: localization_dict_all.get(match.group(1), match.group(0)),
-            localization_dict_used[key]
+def calibrate_loc_dict(local_loc_dict: dict, global_loc_dict: dict):
+    for key in local_loc_dict:
+        local_loc_dict[key] = LOCALIZATION_REPLACE_PATTERN.sub(
+            lambda match: global_loc_dict.get(match.group(1), match.group(0)),
+            local_loc_dict[key]
         )
 
 
@@ -215,8 +215,9 @@ def convert_text_into_game_object_dict(text: str, blocks_dict, logic_keys_dict, 
     def add_raw_game_object_to_dict():
         blocks_dict[key] = RawGameObject(
             loc_key=key,
-            info=value,
-            path=file_path if file_path is not None else ''
+            block=value,
+            path=file_path if file_path is not None else '',
+            obj_type=os.path.basename(os.path.dirname(file_path)) if file_path is not None else ''
         )
 
     if blocks_dict is None:
@@ -244,14 +245,14 @@ def convert_text_into_game_object_dict(text: str, blocks_dict, logic_keys_dict, 
                     error.duplicate_key(key, os.path.dirname(file_path))
             add_raw_game_object_to_dict()
             continue
-        if isinstance(blocks_dict[key].info, list):
-            blocks_dict[key].info.append(value)
+        if isinstance(blocks_dict[key].block, list):
+            blocks_dict[key].block.append(value)
             continue
-        blocks_dict[key].info = [blocks_dict[key].info, value]
+        blocks_dict[key].block = [blocks_dict[key].block, value]
     return blocks_dict
 
 
-def convert_info_block_into_dict(text: str) -> dict:
+def convert_block_into_dict(text: str) -> dict:
     blocks_dict = {}
     logic_keys_dict = {logic_key: -1 for logic_key in LIST_LOGIC_KEYS}
     start = 0
@@ -305,7 +306,7 @@ def parse_value(value):
         if content[0] in ['"', '@']:
             return content
         if any(op in content for op in ('<', '=', '>')):  # 这里通过这三个符号判断是否能够进一步解析
-            attribute_dict = convert_info_block_into_dict(content)
+            attribute_dict = convert_block_into_dict(content)
             return {item: parse_value(attribute_dict[item]) for item in attribute_dict}
         if re.search(r"\s", content) is None:
             return content
@@ -330,7 +331,7 @@ def get_nested_dict_from_path(path: str, override=True) -> dict:
     """
     nested_dict = convert_path_to_game_objects_dict(path, override)
     for game_object in nested_dict.values():
-        game_object.info = parse_value(game_object.info)
+        game_object.block = parse_value(game_object.block)
     return nested_dict
 
 

@@ -48,7 +48,7 @@ def txt_combiner_from_one_folder(path: str) -> str:
 
 def simplify_game_objects_dict(complex_dict: dict) -> dict:
     return {
-        key: complex_dict[key].info
+        key: complex_dict[key].block
         for key in complex_dict
     }
 

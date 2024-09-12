@@ -7,7 +7,7 @@ import utils.textproc as tp
 
 # 文件路径
 
-GAME_OBJECT_PATH_DICT = {
+OBJ_TYPE_PATH_DICT = {
     'buildings': 'buildings',
     'building_groups': 'building_groups',
     'goods': 'goods',
@@ -22,9 +22,9 @@ GAME_OBJECT_PATH_DICT = {
 }
 
 
-def get_nested_dict(folder_path: str, path='common') -> dict:
+def get_objs_dict(folder_path: str, path='common') -> dict:
     return tp.get_nested_dict_from_path(os.path.join(path, folder_path))
 
 
-def get_game_object_dict(game_objects_list: list) -> dict:
-    return {game_object: get_nested_dict(GAME_OBJECT_PATH_DICT[game_object]) for game_object in game_objects_list}
+def get_obj_types_dict(obj_types_list: list) -> dict:
+    return {obj_type: get_objs_dict(OBJ_TYPE_PATH_DICT[obj_type]) for obj_type in obj_types_list}
