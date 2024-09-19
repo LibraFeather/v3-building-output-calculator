@@ -182,7 +182,8 @@ def parse_text_block(start: int, text: str, file_path=None) -> tuple:
     if re.search(r'\s', name):
         segments = re.split(r'\s+', name)
         wrong_names = segments[:-1]
-        error.wrong_name(file_path, wrong_names)
+        wrong_text = error.get_surrounding_lines_by_char(text, start)
+        error.wrong_name(file_path, wrong_names, wrong_text)
         name = segments[-1] if segments else ''
     name += f".[{operator}]" if operator != '=' else ''  # 记录符号，除非是等号
 
@@ -215,7 +216,7 @@ def convert_text_into_game_object_dict(text: str, blocks_dict, logic_keys_dict, 
     def add_raw_game_object_to_dict():
         blocks_dict[key] = RawGameObject(
             loc_key=key,
-            block=value,
+            block=parse_value(value, file_path),
             path=file_path if file_path is not None else '',
             obj_type=os.path.basename(os.path.dirname(file_path)) if file_path is not None else ''
         )
@@ -252,12 +253,12 @@ def convert_text_into_game_object_dict(text: str, blocks_dict, logic_keys_dict, 
     return blocks_dict
 
 
-def convert_block_into_dict(text: str) -> dict:
+def convert_block_into_dict(text: str, path=None) -> dict:
     blocks_dict = {}
     logic_keys_dict = {logic_key: -1 for logic_key in LIST_LOGIC_KEYS}
     start = 0
     while start < len(text):
-        key, value, start = parse_text_block(start, text)
+        key, value, start = parse_text_block(start, text, path)
         if not key:
             continue
         value = convert_to_number(value)
@@ -292,7 +293,7 @@ def convert_path_to_game_objects_dict(path: str, override=True) -> dict:
     return game_objects_dict
 
 
-def parse_value(value):
+def parse_value(value, path=None):
     """
     递归函数，对value进行解析
     """
@@ -306,7 +307,7 @@ def parse_value(value):
         if content[0] in ['"', '@']:
             return content
         if any(op in content for op in ('<', '=', '>')):  # 这里通过这三个符号判断是否能够进一步解析
-            attribute_dict = convert_block_into_dict(content)
+            attribute_dict = convert_block_into_dict(content, path)
             return {item: parse_value(attribute_dict[item]) for item in attribute_dict}
         if re.search(r"\s", content) is None:
             return content
@@ -330,8 +331,6 @@ def get_nested_dict_from_path(path: str, override=True) -> dict:
     :return: 嵌套字典
     """
     nested_dict = convert_path_to_game_objects_dict(path, override)
-    for game_object in nested_dict.values():
-        game_object.block = parse_value(game_object.block)
     return nested_dict
 
 
@@ -366,31 +365,30 @@ def parse_building_modifier(modifier: str) -> dict:  # TODO 这个函数仅能�
         }
 
 
-def parse_modifier(*object_names, modifier: str) -> dict | None:
-    split_list = modifier.split('_')
+def parse_modifier(*object_names, modifier_name: str) -> dict | None:
+    split_list = modifier_name.split('_')
     if len(split_list) < 3:  # modifier应该至少3个单位长
-        return error.can_not_parse(*object_names, modifier)
+        return error.can_not_parse(*object_names, modifier_name)
 
     match split_list[0]:
         case 'goods':
-            return parse_good_modifier(modifier, *object_names)
+            return parse_good_modifier(modifier_name, *object_names)
         case 'building':
-            return parse_building_modifier(modifier)
+            return parse_building_modifier(modifier_name)
         case 'unit':  # 为了防止报错
             return None
         case _:
-            return error.can_not_parse(*object_names, modifier)
+            return error.can_not_parse(*object_names, modifier_name)
 
 
-def parse_modifier_dict(*object_names, modifier_dict: dict, ) -> dict:
+def parse_modifiers_dict(*object_names, modifiers_dict: dict, ) -> dict:
     modifier_info_dict = {}
-    for modifier, value in modifier_dict.items():
-        modifier_info = parse_modifier(*object_names, modifier=modifier)
+    for modifier in modifiers_dict.values():
+        modifier_info = parse_modifier(*object_names, modifier_name=modifier.name)
         if modifier_info is None:
             continue
-        modifier_info['value'] = error.check_attribute_value(
-            *object_names, attribute_value=value, value=0, value_type=(int, float))
-        modifier_info_dict[modifier] = modifier_info
+        modifier_info['value'] = modifier.value
+        modifier_info_dict[modifier.name] = modifier_info
     return modifier_info_dict
 
 

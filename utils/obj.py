@@ -34,7 +34,7 @@ def get_loc(objs_dict: dict) -> dict:
 
 def get_scrit_values(scrit_values_blocks_dict: dict) -> dict:
     return {
-        scrit_value: mm.ScritValues(
+        scrit_value: mm.ScritValue(
             loc_key=scrit_value,
             loc_value=scrit_value,
             value=scrit_values_blocks_dict[scrit_value].block,
@@ -98,7 +98,7 @@ def get_goods(good_blocks_dict: dict, loc_dict: dict) -> dict:
     }
 
 
-def get_pops(pop_blocks_dict: dict, loc_dict: dict) -> dict:
+def get_pop_types(pop_blocks_dict: dict, loc_dict: dict) -> dict:
     return {
         pop_type: mm.POPType(
             loc_key=pop_type,
@@ -123,8 +123,8 @@ def get_buildings(building_blocks_dict: dict, loc_dict: dict) -> dict:
                                                       (int, float, str), False),
             pmgs=error.get_attribute(building_blocks_dict[building], s.PRODUCTION_METHOD_GROUPS, [], list),
             bg=error.get_attribute(building_blocks_dict[building], s.BUILDING_GROUP, '', str),
-            unlocking_technologies=error.get_attribute(building_blocks_dict[building], s.UNLOCKING_TECHNOLOGIES, [],
-                                                       list)
+            unlocking_techs=error.get_attribute(building_blocks_dict[building], s.UNLOCKING_TECHNOLOGIES, [],
+                                                list, False)
         )
         for building in building_blocks_dict
     }
@@ -169,32 +169,17 @@ def get_building_modifiers(pm_info: mm.RawGameObject) -> mm.BuildingModifier:
         error.get_attribute(pm_info, attribute=s.BUILDING_MODIFIERS, value={}, value_type=dict, show_error=False),
         pm_info
     )
-    workforce_scaled = create_sub_raw_game_object(
-        'workforce_scaled',
-        error.get_attribute(building_modifier_info, attribute=s.WORKFORCE_SCALED, value={}, value_type=dict,
-                            show_error=False),
-        building_modifier_info
-    )
-    level_scaled = create_sub_raw_game_object(
-        'level_scaled',
-        error.get_attribute(building_modifier_info, attribute=s.LEVEL_SCALED, value={}, value_type=dict,
-                            show_error=False),
-        building_modifier_info
-    )
-    unscaled = create_sub_raw_game_object(
-        'unscaled',
-        error.get_attribute(building_modifier_info, attribute=s.UNSCALED, value={}, value_type=dict,
-                            show_error=False),
-        building_modifier_info
-    )
+    location = (pm_info.obj_type, pm_info.loc_key, 'building_modifiers')
     return mm.BuildingModifier(
-        workforce_scaled=error.check_modifier_dict_value(workforce_scaled),
-        level_scaled=error.check_modifier_dict_value(level_scaled),
-        unscaled=error.check_modifier_dict_value(unscaled)
+        name='building_modifiers',
+        location=location,
+        workforce_scaled=get_modifier_block('workforce_scaled', location, building_modifier_info),
+        level_scaled=get_modifier_block('level_scaled', location, building_modifier_info),
+        unscaled=get_modifier_block('unscaled', location, building_modifier_info)
     )
 
 
-def get_obj(obj_blocks_dict: dict, loc_dict: dict) -> dict:
+def get_objs(obj_blocks_dict: dict, loc_dict: dict) -> dict:
     return {
         obj: mm.GameObject(
             loc_key=obj,
@@ -212,4 +197,30 @@ def create_sub_raw_game_object(loc_key: str, block, father_info: mm.RawGameObjec
         block=block,
         path=father_info.path,
         obj_type=f"{father_info.obj_type}.{father_info.loc_key}"
+    )
+
+
+def get_modifier_block(name: str, location: tuple, parent_info) -> mm.ModifierBlock:
+    """
+    仅用于提取building_modifiers的三个属性
+    """
+    modifier_block = create_sub_raw_game_object(
+        name,
+        error.get_attribute(parent_info, attribute=name, value={}, value_type=dict,
+                            show_error=False),
+        parent_info
+    )
+    modifier_block = error.check_modifier_dict_value(modifier_block)
+    modifiers_dict = {
+        modifier: mm.Modifier(
+            name=modifier,
+            location=location + (name, modifier),
+            value=value
+        )
+        for modifier, value in modifier_block.items()
+    }
+    return mm.ModifierBlock(
+        name=name,
+        location=location + (name,),
+        value=modifiers_dict
     )

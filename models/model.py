@@ -6,26 +6,43 @@ from typing import Any
 
 
 @dataclass
-class RawGameObject:
+class BaseGameObject:
+    path: str
+    obj_type: str
     loc_key: str
+
+
+@dataclass
+class RawGameObject(BaseGameObject):
     block: Any
-    path: str
-    obj_type: str
 
 
 @dataclass
-class GameObject:
-    loc_key: str
+class GameObject(BaseGameObject):
     loc_value: str
-    path: str
-    obj_type: str
 
 
 @dataclass
-class BuildingModifier:
-    workforce_scaled: dict
-    level_scaled: dict
-    unscaled: dict
+class Attribute:
+    name: str
+    location: tuple
+
+
+@dataclass
+class ModifierBlock(Attribute):
+    value: dict
+
+
+@dataclass
+class BuildingModifier(Attribute):
+    workforce_scaled: ModifierBlock
+    level_scaled: ModifierBlock
+    unscaled: ModifierBlock
+
+
+@dataclass
+class Modifier(Attribute):
+    value: int | float
 
 
 @dataclass
@@ -45,7 +62,7 @@ class Technology(GameObject):
 
 
 @dataclass
-class ScritValues(GameObject):
+class ScritValue(GameObject):
     value: Any
 
 
@@ -59,7 +76,7 @@ class Building(GameObject):
     required_construction: int | float | str
     pmgs: list
     bg: str
-    unlocking_technologies: list
+    unlocking_techs: list
 
 
 @dataclass
@@ -68,9 +85,8 @@ class PMG(GameObject):
 
 
 @dataclass
-class Name:
-    loc_key: str
-    loc_value: str
+class Good(GameObject):
+    cost: int | float
 
 
 @dataclass
@@ -80,13 +96,32 @@ class POPType(GameObject):
 
 
 @dataclass
-class Good(GameObject):
+class Info:
+    loc_key: str
+    loc_value: str
+
+
+@dataclass
+class GoodInfo(Info):
     cost: int | float
 
 
-# 生产方式应用此类节点
 @dataclass
-class PMNode(Name):
+class TechInfo(Info):
+    era: int
+
+
+@dataclass
+class BuildingInfo(Info):
+    bg: BuildingGroup
+    display_bg: BuildingGroup
+    pmgs: list
+    unlocking_techs: list
+    required_construction: int | float
+
+
+@dataclass
+class PMInfo(Info):
     goods_add: dict
     goods_mult: dict
     workforce: dict
@@ -96,24 +131,10 @@ class PMNode(Name):
     unlocking_principles: list
     unlocking_laws: list
     disallowing_laws: list
-    unlocking_identity: Name
-
-
-@dataclass
-class TechNode(Name):
-    era: str
+    unlocking_identity: str
 
 
 # 生产方式群应用此类节点
 @dataclass
-class NormalNode(Name):
+class NormalNode(Info):
     children: list
-
-
-# 建筑应用此类节点
-@dataclass
-class BuildingNode(NormalNode):
-    building_group: BuildingGroup
-    building_group_display: BuildingGroup
-    unlocking_technologies: list
-    required_construction: int | float

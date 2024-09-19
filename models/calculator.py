@@ -12,11 +12,11 @@ import utils.error as error
 
 class Calculator:
     def __init__(self):
-        building_info_tree_complex = BuildingInfoTree()
-        self.goods_info = building_info_tree_complex.goods_info
-        self.pop_type_info = building_info_tree_complex.pop_types_info
+        info_tree = BuildingInfoTree()
+        self.goods_info = info_tree.goods_info
+        self.pop_type_info = info_tree.obj.pop_types
 
-        self.building_info_tree = building_info_tree_complex.tree
+        self.building_info_tree = info_tree.buildings_info
         self.building_output_info_list = self.__generate_building_output_info_list()
 
         self.COLUMN_HEADERS = {
@@ -40,12 +40,12 @@ class Calculator:
             good: f"{good_info.loc_value}_{good_info.loc_key}"
             for good, good_info in self.goods_info.items()
         }
-        self.automation_pm_list = building_info_tree_complex.automation_pm_list
+        self.automation_pm_list = info_tree.automation_pm_list
 
     # ------------------------------------------------------------------------------------------
     def __generate_one_line_data_list_for_single_building(self, building) -> list:
         one_line_data_list = []
-        combinations = itertools.product(*(node.children for node in building.children))
+        combinations = itertools.product(*(pmg.pms for pmg in building.pmgs))
 
         for combination in combinations:
             pms_set = {pm.loc_key for pm in combination}
@@ -56,7 +56,7 @@ class Calculator:
             )
 
             if can_generate_data:
-                pmgs_list = [pmg.loc_key for pmg in building.children]  # 这里使用localization_key防止重复
+                pmgs_list = [pmg.loc_key for pmg in building.pmgs]  # 这里使用localization_key防止重复
                 one_line_data = self.__generate_one_line_data(dict(zip(pmgs_list, combination)), building)
                 one_line_data = self.__calculate_data(one_line_data, building)
                 one_line_data_list.append(one_line_data)
@@ -89,10 +89,10 @@ class Calculator:
         one_line_data = {'raw_data': {}, 'pm_data': {}, 'processed_data': {}, 'other_data': {}, 'goods_data': {}}
 
         # 处理建筑本身的科技需求
-        if building.unlocking_technologies:
-            era = max(building.unlocking_technologies, key=lambda _tech: _tech.era).era
+        if building.unlocking_techs:
+            era = max(building.unlocking_techs, key=lambda _tech: _tech.era).era
             highest_tech = []
-            for tech in building.unlocking_technologies:
+            for tech in building.unlocking_techs:
                 if tech.era == era and tech not in highest_tech:
                     highest_tech.append(tech)
         else:
@@ -101,7 +101,7 @@ class Calculator:
 
         subsistence_output = 0
 
-        techs_all = building.unlocking_technologies.copy()
+        techs_all = building.unlocking_techs.copy()
         unlocking_principles = []
         unlocking_identity = []
         unlocking_laws = []
@@ -125,7 +125,7 @@ class Calculator:
                 if tech not in techs_all:
                     techs_all.append(tech)
             add_object_to_list(pm.unlocking_principles, unlocking_principles)
-            if pm.unlocking_identity is not None:
+            if pm.unlocking_identity:
                 unlocking_identity.append(pm.unlocking_identity)
             add_object_to_list(pm.unlocking_laws, unlocking_laws)
             add_object_to_list(pm.disallowing_laws, disallowing_laws)
@@ -189,14 +189,14 @@ class Calculator:
     # ------------------------------------------------------------------------------------------
     def __generate_building_output_info_list(self) -> list:
         return [(building, self.__generate_one_line_data_list_for_single_building(building)) for building in
-                self.building_info_tree]
+                self.building_info_tree.values()]
 
     def __transfer_dict_to_df(self, one_line_data_list, building):
-        name = (f"{building.building_group_display.loc_value}"
+        name = (f"{building.display_bg.loc_value}"
                 f"_{building.loc_value}_{building.loc_key}.xlsx")
         name = error.check_filename(name)
         column_pmg = {pmg.loc_key: f"{pmg.loc_value}_{pmg.loc_key}"
-                      for pmg in building.children}
+                      for pmg in building.pmgs}
         colum_rename = column_pmg | self.COLUMN_HEADERS | self.COLUMN_GOODS
         rows = []
         for one_line_data in one_line_data_list:
@@ -220,14 +220,14 @@ class Calculator:
         building_info_df.rename(columns=colum_rename, inplace=True)
         building_info_df.to_excel(
             f"{OUTPUT_PATH}\\buildings\\{name}", index=False)
-        print(f'{name}输出成功')
+        print(f"输出成功：{name}")
 
     def output_every_building(self):
         for building, one_line_data_list in self.building_output_info_list:
             self.__transfer_dict_to_df(one_line_data_list, building)
 
     def output_all_buildings(self):
-        name = "00_总表.xlsx"
+        name = '00_总表.xlsx'
         rows = []
         try:
             max_len_pmg = max(
@@ -254,14 +254,14 @@ class Calculator:
                         pm_list.remove(automation_pm)
                         pm_list.insert(2, automation_pm)
                 pm_data = {column_4pm[i]: pm_list[i] for i in range(len(column_4pm))}
-                row = {'建筑组': building.building_group_display.loc_value} | {
+                row = {'建筑组': building.display_bg.loc_value} | {
                     '建筑': building.loc_value} | pm_data | one_line_data['processed_data'] | one_line_data[
                           'other_data'] | one_line_data['goods_data']
                 rows.append(row)
         summary_table_df = pd.DataFrame(rows)
         summary_table_df.rename(columns=self.COLUMN_HEADERS | self.COLUMN_GOODS, inplace=True)
         summary_table_df.to_excel(f"{OUTPUT_PATH}\\buildings\\{name}", index=False)
-        print(f"{name}输出成功")
+        print(f"输出成功：{name}")
 
     def output(self):
         self.output_every_building()
