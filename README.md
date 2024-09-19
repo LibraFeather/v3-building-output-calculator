@@ -16,9 +16,7 @@ Calista C.Manstainne，Recognized User L，19/09/2024
 
 ### 安装Python
 
-本工具基于Python 3.12开发，因此需要安装Python解释器来运作。
-
-[Python官网](https://www.python.org/)
+本工具基于[Python 3.12](https://www.python.org/)开发，因此需要安装Python解释器来运作。
 
 ### 安装Pandas库和openpyxl库
 
@@ -99,3 +97,6 @@ Calista C.Manstainne，Recognized User L，19/09/2024
 比如检测某个商品的基础价格是否存在，以及是否是整数或浮点数。
 5. 将`GameObject`类转变为`Info`类，使其能够被`Calculator`类处理。这一步会检测游戏对象的某些属性是否有定义，比如建筑的建筑组是否存在。
 6. 由`Calculator`类进行计算并输出为excel表格。
+
+## 许可证
+本项目采用 [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html#license-text) 许可证。
