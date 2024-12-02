@@ -19,7 +19,7 @@ class GameObjectBuilder:
         obj_types_dict = get_obj_types_dict(local_obj_types)
         for obj_types in obj_types_dict:
             if obj_types != 'script_values':
-                obj_types_dict[obj_types] = error.check_objects_dict(obj_types_dict[obj_types], obj_types)
+                obj_types_dict[obj_types] = error.check_objects_dict(obj_types_dict[obj_types])
 
         self.loc = obj.get_loc(obj_types_dict)
 

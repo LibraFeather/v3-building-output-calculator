@@ -195,6 +195,7 @@ def create_sub_raw_game_object(loc_key: str, block, father_info: mm.RawGameObjec
     return mm.RawGameObject(
         loc_key=loc_key,
         block=block,
+        text='',
         path=father_info.path,
         obj_type=f"{father_info.obj_type}.{father_info.loc_key}"
     )

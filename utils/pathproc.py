@@ -43,14 +43,18 @@ def get_file_paths(folder_path: str):
     is_localization = True if folder_path == 'localization' else False
 
     file_paths = {}
-    vanilla_folder_path = os.path.join(c.get_vanilla_path(), folder_path)
-    mod_folder_path = os.path.join(c.get_mod_path(), folder_path)
+    vanilla_path = c.get_vanilla_path()
+    mod_path = c.get_mod_path()
+    vanilla_folder_path = os.path.join(vanilla_path, folder_path)
+    mod_folder_path = os.path.join(mod_path, folder_path)
 
     if folder_path in replace_paths_list and os.path.exists(
             mod_folder_path):  # 如果路径在replace_paths_list内，则忽略vanilla_folder_path
         update_paths_dict(mod_folder_path, file_paths, is_localization)
         return list(file_paths.values())
 
+    if not os.path.exists(vanilla_folder_path):
+        c.wrong_path(vanilla_path, 'VANILLA')
     update_paths_dict(vanilla_folder_path, file_paths, is_localization)
     if os.path.exists(mod_folder_path):  # 检查input文件夹内是否有相同文件并替换
         update_paths_dict(mod_folder_path, file_paths, is_localization)

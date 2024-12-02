@@ -23,3 +23,5 @@ def open_json(file_path: str):
             return json.load(file)
     except FileNotFoundError:
         print(f"错误：找不到{file_path}")
+    except json.decoder.JSONDecodeError:
+        print(f"错误：文件无法解析，{file_path}")

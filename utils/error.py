@@ -7,12 +7,14 @@ import re
 from utils.config_loader import open_json
 from utils.config import VANILLA_PATH
 
+
 config = open_json('config\\warning_settings.json')
 
+
 if config is not None:
-    SHOW_DUPLICATE_KEY_WARNING = config.get('SHOW_DUPLICATE_KEY_WARNING', '') == 'True'
-    SHOW_LOCALIZATION_WARNING = config.get('SHOW_LOCALIZATION_WARNING', '') == 'True'
-    SHOW_LACK_LOCALIZATION_WARNING = config.get('SHOW_LACK_LOCALIZATION_WARNING', '') == 'True'
+    SHOW_DUPLICATE_KEY_WARNING = config.get('SHOW_DUPLICATE_KEY_WARNING', 'True') == 'True'
+    SHOW_LOCALIZATION_WARNING = config.get('SHOW_LOCALIZATION_WARNING', 'True') == 'True'
+    SHOW_LACK_LOCALIZATION_WARNING = config.get('SHOW_LACK_LOCALIZATION_WARNING', 'False') == 'True'
 else:
     SHOW_DUPLICATE_KEY_WARNING = True
     SHOW_LOCALIZATION_WARNING = True
@@ -37,18 +39,22 @@ def merge_game_objects(object_names) -> str:
 
 
 def redundant_bracket(path: str):
-    print(f"错误：多余大括号，{path}")
+    print(f"错误：花括号冗余，{path}")
 
 
 def lack_attribute(*object_names, attribute: str, value=None, show_error=False):
     object_name = merge_game_objects(object_names)
-    error_info = f"错误：对象属性缺失，{object_name}.{attribute}"
+    error_info = f"错误：属性缺失，{object_name}.{attribute}"
     return assumption_value(error_info, value, show_error)
 
 
 def lack_localization(object_name: str, show_error=True):
     if SHOW_LACK_LOCALIZATION_WARNING and show_error:
-        print(f"提醒：对象本地化缺失，{object_name}")
+        print(f"提醒：本地化缺失，{object_name}")
+
+
+def wrong_text(path: str, text: str):
+    print(f"错误：文本异常，{path}\n######\n{text.strip()}\n######\n")
 
 
 # ------------------------------------------------------------------------------------------
@@ -57,23 +63,23 @@ def lack_localization(object_name: str, show_error=True):
 def wrong_type(*object_names, obj_type, value=None):
     object_name = merge_game_objects(object_names)
     if obj_type == '异常':
-        error_info = f"错误：对象类型异常，{object_name}"
+        error_info = f"错误：类型异常，{object_name}"
     else:
-        error_info = f"错误：对象类型异常，{object_name}的类型不是{obj_type}"
+        error_info = f"错误：类型异常，{object_name}的类型不是{obj_type}"
     return assumption_value(error_info, value)
 
 
 # 基本函数
 def lack_definition(*object_names: str, value=None):
     object_name = merge_game_objects(object_names)
-    error_info = f"错误：对象无定义，{object_name}"
+    error_info = f"错误：定义缺失，{object_name}"
     assumption_value(error_info, value)
     return value
 
 
 def can_not_parse(*object_names, value=None):
     object_name = merge_game_objects(object_names)
-    error_info = f"提醒：对象无法解析，{object_name}"
+    error_info = f"提醒：无法解析，{object_name}"
     return assumption_value(error_info, value)
 
 
@@ -106,7 +112,7 @@ def check_attribute_value(*object_names, attribute_value, value, value_type, sho
     if isinstance(attribute_value, value_type):
         return attribute_value
     if not attribute_value:
-        error_info = f"错误：属性的值为空，{object_name}"
+        error_info = f"错误：属性为空，{object_name}"
         return assumption_value(error_info, value, show_error)
     if isinstance(attribute_value, list):
         value = check_attribute_value(
@@ -188,8 +194,9 @@ def localize_principle(local_loc_dict: dict, principles: list, global_loc_dict: 
 def check_long_building_name(loc_dict: dict, buildings: list):
     for building in buildings:  # dummy building的本地化值过长，需要被替换，这里用本地化值的长度作为依据
         if len(loc_dict[building]) > 50:
-            print(f"提醒：本地化值过长，{building}，因此被dummy代替")
-            loc_dict[building] = 'dummy'
+            replace = 'dummy'
+            print(f"提醒：本地化值过长，{building}，因此被{replace}代替")
+            loc_dict[building] = replace
 
 
 # ------------------------------------------------------------------------------------------
@@ -243,13 +250,13 @@ def wrong_name(path: str, names: list, text: str):
         if name == '}':
             redundant_bracket(path)
         else:
-            print(f"错误：文本异常，{path}\n######\n{text}\n######\n")
+            wrong_text(path, text)
 
 
 def check_bracket(path: str):
     if path is None:
         path = ''
-    print(f"错误：文件缺失花括号，{path}")
+    print(f"错误：花括号缺失，{path}")
 
 
 def duplicate_key(key: str, path=None):
@@ -322,15 +329,15 @@ def check_unclosed_quotes(key: str, value: str):
 # 其他函数
 
 
-def check_objects_dict(objs: dict, obj_type: str) -> dict:
+def check_objects_dict(objs: dict) -> dict:
     """
     用于确保字典确实是一个字典
     """
     valid_objs = {}
     for obj, obj_info in objs.items():
         if not isinstance(obj_info.block, dict):
-            if obj[0] != "@":
-                print(f"错误：文件格式错误，{obj_type}.{obj}")
+            if obj[0] != '@':
+                wrong_text(obj_info.path, obj_info.text)
         else:
             valid_objs[obj] = obj_info
     return valid_objs

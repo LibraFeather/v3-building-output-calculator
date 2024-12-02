@@ -15,6 +15,7 @@ class BaseGameObject:
 @dataclass
 class RawGameObject(BaseGameObject):
     block: Any
+    text: str
 
 
 @dataclass

@@ -176,7 +176,7 @@ def parse_text_block(start: int, text: str, file_path=None) -> tuple:
     if operator is None:
         remaining = text[start:len_text].strip()
         error.check_remaining(file_path, remaining)
-        return '', '', len_text + 1
+        return '', '', len_text + 1, ''
 
     name = text[start:operator_start].strip()
     if re.search(r'\s', name):
@@ -189,27 +189,30 @@ def parse_text_block(start: int, text: str, file_path=None) -> tuple:
 
     first_non_space = re.search(r"\S+", text[operator_end:len_text])
     if first_non_space is None:
-        return name, '', len_text + 1
+        return name, '', len_text + 1, ''
     first_non_space_start = operator_end + first_non_space.start()
     first_non_space_end = operator_end + first_non_space.end()
     bracket = re.search(r"\{", first_non_space.group())
     if first_non_space.group()[0] == '@':
         content = re.search(r".*", text[first_non_space_start:len_text])
-        return name, content.group(), first_non_space_start + content.end()
+        end = first_non_space_start + content.end()
+        return name, content.group(), end, text[start:end]
     if bracket:
         bracket_start = first_non_space_start + bracket.start()
         name += f".[{text[first_non_space_start:bracket_start]}]" if text[first_non_space_start:bracket_start] else ''
-        return name, *parse_bracket_content(bracket_start)
+        value, end = parse_bracket_content(bracket_start)
+        return name, value, end, text[start:end]
     if first_non_space.group()[0] == '"':
-        return name, *parse_quote_content(first_non_space_start)
+        value, end = parse_quote_content(first_non_space_start)
+        return name, value, end, text[start:end]
     second_non_space = re.search(r"\S+", text[first_non_space_end:len_text])
     if second_non_space is None:
-        return name, first_non_space.group(), len_text + 1
+        return name, first_non_space.group(), len_text + 1, text[start:]
     second_non_space_start = first_non_space_end + second_non_space.start()
     if second_non_space.group()[0] == '{':
         name += f".[{first_non_space.group()}]"
         return name, *parse_bracket_content(second_non_space_start)
-    return name, first_non_space.group(), second_non_space_start
+    return name, first_non_space.group(), second_non_space_start, text[start:second_non_space_start]
 
 
 def convert_text_into_game_object_dict(text: str, blocks_dict, logic_keys_dict, file_path, override=True) -> dict:
@@ -217,6 +220,7 @@ def convert_text_into_game_object_dict(text: str, blocks_dict, logic_keys_dict, 
         blocks_dict[key] = RawGameObject(
             loc_key=key,
             block=parse_value(value, file_path),
+            text=raw_text,
             path=file_path if file_path is not None else '',
             obj_type=os.path.basename(os.path.dirname(file_path)) if file_path is not None else ''
         )
@@ -228,7 +232,7 @@ def convert_text_into_game_object_dict(text: str, blocks_dict, logic_keys_dict, 
     text = re.sub(r"#.*$", '', text, flags=re.MULTILINE)
     start = 0
     while start < len(text):
-        key, value, start = parse_text_block(start, text, file_path)
+        key, value, start, raw_text = parse_text_block(start, text, file_path)
         if not key:
             continue
         value = convert_to_number(value)
@@ -258,7 +262,7 @@ def convert_block_into_dict(text: str, path=None) -> dict:
     logic_keys_dict = {logic_key: -1 for logic_key in LIST_LOGIC_KEYS}
     start = 0
     while start < len(text):
-        key, value, start = parse_text_block(start, text, path)
+        key, value, start, raw_text = parse_text_block(start, text, path)
         if not key:
             continue
         value = convert_to_number(value)
@@ -287,7 +291,7 @@ def convert_path_to_game_objects_dict(path: str, override=True) -> dict:
     game_objects_dict = {}
     logic_keys_dict = {logic_key: -1 for logic_key in LIST_LOGIC_KEYS}
     for file_path in list_file_paths:  # 对文件分别进行处理，以防止格式错误造成污染
-        if not file_path.endswith('.info'):  # 忽略info文件，这个文件的作用类似注释
+        if not file_path.endswith('.md'):  # 忽略info文件，这个文件的作用类似注释
             text = rf.read_file_with_encoding(file_path)
             convert_text_into_game_object_dict(text, game_objects_dict, logic_keys_dict, file_path, override)
     return game_objects_dict
